@@ -15,6 +15,8 @@ https://www.computerenhance.com/p/table-of-contents
 nasm result.asm
 diff upstream/perfaware/part1/listing_0037_single_register_mov result
 
+zig build run -- upstream/perfaware/part1/listing_0038_many_register_mov > result.asm && diff upstream/perfaware/part1/listing_0038_many_register_mov.asm result.asm
+
 ## Doc
 https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 - P.160 Decoding

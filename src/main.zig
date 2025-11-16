@@ -9,19 +9,25 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
+    var buf: [1024]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&buf);
+    defer stdout.file.unlock();
+
     var args = try std.process.argsWithAllocator(alloc);
     defer args.deinit();
 
     _ = args.next(); // The file itself.
     if(args.next()) |path_relative| {
-        std.debug.print("; {s}:\n", .{ path_relative });
+        try stdout.interface.print("; {s}:\n", .{ path_relative });
         const contents = try std.fs.cwd().readFileAlloc(alloc, path_relative, 1024);
         defer alloc.free(contents);
 
         const result: []u8 = try part1.writeMnemonic(alloc, contents);
         defer alloc.free(result);
 
-        std.debug.print("{s}", .{ result });
+
+        try stdout.interface.print("{s}", .{ result });
+        try stdout.interface.flush();
     } else {
         std.debug.print("Error: No file specified\n", .{});
     }
