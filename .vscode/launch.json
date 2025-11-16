@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/computer_enhance",
             "args": [
-                "",
+                "upstream/perfaware/part1/listing_0037_single_register_mov",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
