@@ -18,6 +18,12 @@ diff upstream/perfaware/part1/listing_0037_single_register_mov result
 testing:
 zig build run -- upstream/perfaware/part1/listing_0039_more_movs > result.asm && nasm result.asm && diff result upstream/perfaware/part1/listing_0039_more_movs
 
+## Taks:
+(second is always the challenge version).
+0037-0038: mov
+0039-0040: mov variants.
+0041-0042: add_sub_cmp_jnz: p.165-p.166
+
 ## Doc
 https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 - P.160 Decoding.
@@ -40,4 +46,15 @@ https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
     - (bx)+(si), (bx)+(di), (bp)+(si), (bp)+(di), (si), (di), (bp), (bx)  
     - with the MOD field you add d8 or d16 to it.
     - MOD == 0 and RM = 110 => 2 byte immediate direct address.
-
+- Basic pattern for a lot of instructions:
+    [Opcode DW][MOD REG R/M] DISP
+    [Opcode W][MOD 000 R/M] IMM
+    => Because of this you can bake in memory access into the operation (e.g. ADD with memory access).
+- Arithmetic Commands:
+    - Immediate mode version have [MOD XXX R/M] in the second byte.
+    - the XXX is the actual arithmetic operation to do.
+    - This means we have the same opcode for different arithmetic operations.
+    - The same bit-pattern is used as the last 3 bits of the operand.
+- Conditional Jump:
+    - First byte: Patterns states which kind of jump (JNZ).
+    - Second byte is 8-bit displacement.

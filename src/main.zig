@@ -33,44 +33,80 @@ pub fn main() !void {
     }
 }
 
+fn runCommand(argv: []const []const u8, allocator: std.mem.Allocator) ![]u8 {
+    var cmd = std.process.Child.init(argv, allocator);
+    cmd.stdout_behavior = .Pipe;
+    try cmd.spawn();
+
+    const result = try cmd.stdout.?.readToEndAlloc(allocator, std.math.maxInt(u32));
+    errdefer allocator.free(result);
+
+    _ = try cmd.wait();
+    return result;
+}
+
 test "decode" {
-    // TODO: my code generates a valid .asm file. Write that to disc. use nasm to compile and then compare binaries (diff in linux).
-
     const gpa = std.testing.allocator;
-
-    const test_files = [_][]const u8{
-        "upstream/perfaware/part1/listing_0037_single_register_mov",
+    const test_folder = "upstream/perfaware/part1/";
+    const bin_actual_file = "results/result";
+    const asm_actual_file = "results/result.asm";
+    const grep_asm_expected_file = "results/grep_expected.asm";
+    const grep_asm_actual_file = "results/grep_result.asm";
+    const test_names = [_][]const u8{
+        "listing_0037_single_register_mov",
+        "listing_0038_many_register_mov",
+        "listing_0039_more_movs",
     };
 
-    for (test_files) |test_file| {
-        const file_bin = test_file;
-        const content_bin = try std.fs.cwd().readFileAlloc(gpa, file_bin, std.math.maxInt(u32));
-        defer gpa.free(content_bin);
+    for (test_names, 0..) |test_name, test_idx| {
+        // create new binary.
+        const bin_file = try std.fmt.allocPrint(gpa, "{s}{s}", .{ test_folder, test_name });
+        defer gpa.free(bin_file);
+        const bin_expected = try std.fs.cwd().readFileAlloc(gpa, bin_file, std.math.maxInt(u32));
+        defer gpa.free(bin_expected);
 
-        const file_asm = try std.fmt.allocPrint(gpa, "{s}.asm", .{ test_file });
-        const content_asm = try std.fs.cwd().readFileAlloc(gpa, file_asm, std.math.maxInt(u32));
-        defer gpa.free(content_asm);
+        // TODO: Do that for each line (first create instructions struct, then print to buffer).
+        const asm_actual: []u8 = try part1.writeMnemonic(gpa, bin_expected);
+        defer gpa.free(asm_actual);
+        try std.fs.cwd().writeFile(.{ .data = asm_actual, .sub_path = asm_actual_file, .flags = .{} });
 
-        const content_parsed: []u8 = try part1.writeMnemonic(gpa, file_asm);
-        defer gpa.free(content_parsed);
-        
-        var line_idx: usize = 0;
-        for (file_asm) |asm_line| {
-            if(asm_line.len == 0 or asm_line[0] == ';' or std.mem.eql(u8, "\n", asm_line)) {
-                continue;
-            }
+        const nasm_result = try runCommand(&[_][]const u8{ "nasm", asm_actual_file }, gpa);
+        defer gpa.free(nasm_result);
 
-            try std.testing.expectEqualSlices(u8, asm_line, content_parsed[line_idx]);
-            line_idx += 1;
+        const bin_actual = try std.fs.cwd().readFileAlloc(gpa, bin_actual_file, std.math.maxInt(u32));
+        defer gpa.free(bin_actual);
+
+        // create text diff
+        const asm_file = try std.fmt.allocPrint(gpa, "{s}.asm", .{ bin_file });
+        defer gpa.free(asm_file);
+        const asm_expected = try std.fs.cwd().readFileAlloc(gpa, asm_file, std.math.maxInt(u32));
+        defer gpa.free(asm_expected);
+
+        const grep_asm_expected = try runCommand(&[_][]const u8{ "grep", "-Ev", "^\\s*(;|$)", asm_file }, gpa);
+        defer gpa.free(grep_asm_expected);
+        try std.fs.cwd().writeFile(.{ .data = grep_asm_expected, .sub_path = grep_asm_expected_file, .flags = .{} });
+
+        const grep_asm_actual = try runCommand(&[_][]const u8{ "grep", "-Ev", "^\\s*(;|$)", asm_actual_file }, gpa);
+        defer gpa.free(grep_asm_actual);
+        try std.fs.cwd().writeFile(.{ .data = grep_asm_actual, .sub_path = grep_asm_actual_file, .flags = .{} });
+
+        const diff_result = try runCommand(&[_][]const u8{ "diff", "-y", grep_asm_actual_file, grep_asm_expected_file }, gpa);
+        defer gpa.free(diff_result);
+
+        // tests
+        errdefer {
+            std.debug.print("Test: {d}: {s}\n", .{ test_idx, bin_file });
+            std.debug.print("expected:\n", .{});
+            std.debug.dumpHex(bin_expected);
+            std.debug.print("actual:\n", .{});
+            std.debug.dumpHex(bin_actual);
+            std.debug.print("diff:\n", .{});
+            std.debug.print("{s}\n", .{ diff_result });
         }
-    }
-
-    // TODO: Use the .asm file and the compiled binary and compare them. Skip all lines in the .asm files starting with ; and empty lines!
-    // TODO: Use a list of files!
-    const path_relative = "upstream/perfaware/part1/listing_0037_single_register_mov";
-    const contents = try std.fs.cwd().readFileAlloc(gpa, path_relative, 1024);
-    defer gpa.free(contents);
-    for (contents) |byte| {
-        try std.testing.expectEqual(10, byte);
+        const min_len = @min(bin_expected.len, bin_actual.len);
+        for (bin_expected[0..min_len], bin_actual[0..min_len]) |expected, actual| {
+            try std.testing.expectEqual(expected, actual);
+        }
+        try std.testing.expectEqual(bin_expected.len, bin_actual.len);
     }
 }

@@ -157,6 +157,7 @@ pub fn getFields(opcode: Opcode, assembly: []const u8, idx: usize) Fields {
     };
 }
 
+// TODO: Maybe the output of the decoder should be an opcode + payload (tagged union).
 pub fn writeMnemonic(alloc: std.mem.Allocator, assembly: []const u8) ![]u8 {
     var array_list = try std.ArrayList(u8).initCapacity(alloc, 100);
     defer array_list.deinit(alloc);
