@@ -1,6 +1,25 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
+// TODO: New design:
+// https://github.com/cmuratori/computer_enhance/blob/Part1_0_SlowDecode/perfaware/sim86/sim86.h 
+// 1st: instruction table or function (getOpcde() + getFields()) that gives me definition for an instruction.
+    // table can also encode implicity knowledge about an instruction. 
+    // (ALU versions of instructions also define that they use the alu register). 
+    // All the fields that are technically not in the bytes but we define when we define the table.
+    // Pseudofields (they have a value)! otherwise get it from the instruction stream.
+    // Implicitly Wide. 
+    // Instruction Table is a [256]Array
+// 2nd: decoder: Takes instruction table + slice of memory and returns instruction + new subslice.
+// 3rd: printer: takes instruction and returns one line of text for that instruction.
+// Decoder Context: once needed so that previous instructions can have effect on the next instruction.
+// Do we have enough bytes left in slice for this instruction?
+// use actual flags for knowing if an isntruction is wide or not.
+// instead of "just reading asm", it loads a file that represents memory i can use.
+    // have a memory struct with ther 1mbyte of memory of the 8086 (slice)?
+    // 8086 memory can be accessed out of bounds (if not enough memory is available), by masking bits away we don't have. 
+
+
 // Registers
 const RegisterFile = packed union {
     r16: packed struct {
@@ -65,6 +84,8 @@ const RegFieldWide = enum(u3) {
     ax, cx, dx, bx,
     sp, bp, si, di,
 };
+// TODO: This enum should also include the direct effective addresses?
+// TODO: Maybe encode the entire effective address expression?
 const RegMemField = enum(u3) {
     bx_si, bx_di, bp_si, bp_di, 
     si, di, bp, bx,
@@ -99,6 +120,8 @@ const Infix = packed struct(u8) {
     // => mov [BP+75],byte12 or mov [BP+75],word12 (sets w flag!). 
     // => implement all moves in the manual but not segment register versions. 
 
+// TODO: Instead of one table for the opcode and a table for the fields have a single table.
+// TODO: Don't define the length in bits, but in bytes.
 pub fn getOpcode(prefix: u8) Opcode {
     return switch(prefix) {
         0b1000_1000...0b1000_1011 => .mov_rm,

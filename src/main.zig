@@ -1,6 +1,7 @@
 const std = @import("std");
 const computer_enhance = @import("computer_enhance");
 const part1 = @import("part1/8086.zig");
+const Decoder = @import("sim86/Decoder.zig");
 
 
 pub fn main() !void {
@@ -78,6 +79,10 @@ test "decode" {
         defer gpa.free(asm_actual);
         try std.fs.cwd().writeFile(.{ .data = asm_actual, .sub_path = asm_actual_file, .flags = .{} });
 
+        // TODO: The new code!
+        var decoder: Decoder = .{};
+        const instruction, _ = decoder.decode(bin_expected);
+
         var nasm = std.process.Child.init(&[_][]const u8{ "nasm", asm_actual_file }, gpa);
         try nasm.spawn();
         _ = try nasm.wait();
@@ -86,13 +91,14 @@ test "decode" {
         defer gpa.free(bin_actual);
 
         errdefer {
-            std.debug.print("Test: {d}: {s}\n", .{ test_idx, bin_file });
-            std.debug.print("expected:\n", .{});
+            std.debug.print("# Test: {d}: {s}\n", .{ test_idx, bin_file });
+            std.debug.print("## expected:\n", .{});
             std.debug.dumpHex(bin_expected);
-            std.debug.print("actual:\n", .{});
+            std.debug.print("## actual:\n", .{});
             std.debug.dumpHex(bin_actual);
-            std.debug.print("diff:\n", .{});
-            std.debug.print("manual diff:\n", .{});
+            std.debug.print("## new output:\n", .{});
+            std.debug.print("{f}\n", .{ instruction });
+            std.debug.print("## diff:\n", .{});
             dumpTextDiff(asm_expected, asm_actual);
         }
         const min_len = @min(bin_expected.len, bin_actual.len);
@@ -102,3 +108,4 @@ test "decode" {
         try std.testing.expectEqual(bin_expected.len, bin_actual.len);
     }
 }
+
