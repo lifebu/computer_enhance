@@ -1,13 +1,6 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const def = @import("defines.zig");
-
-// 1st: instruction table or function (getOpcde() + getFields()) that gives me definition for an instruction.
-// table can also encode implicity knowledge about an instruction. 
-// (ALU versions of instructions also define that they use the alu register). 
-// All the fields that are technically not in the bytes but we define when we define the table.
-// Pseudofields (they have a value)! otherwise get it from the instruction stream.
-// Implicitly Wide. 
-// Instruction Table is a [256]Array
 
 const Self = @This();
 
@@ -37,14 +30,53 @@ pub const RegisterFileId = enum(u5) {
 pub const OperandRegister = struct {
     rfid: RegisterFileId,
     size: u2,
+
+    pub fn format(self: OperandRegister, writer: *std.io.Writer) std.io.Writer.Error!void {
+        assert(self.size != 0 and self.size != 3);
+        if(self.size == 1) {
+            try writer.print("{s}", .{ @tagName(self.rfid) });
+        } else {
+            try writer.print("{s}", .{ 
+                switch (self.rfid) {
+                    .al => "ax", .ah => "ax",
+                    .cl => "cx", .ch => "cx",
+                    .dl => "dx", .dh => "dx",
+                    .bl => "bx", .bh => "bx",
+                    .spl => "sp", .sph => "sp",
+                    .bpl => "bp", .bph => "bp",
+                    .sil => "si", .sih => "si",
+                    .dil => "di", .dih => "di",
+                    .csl => "cs", .csh => "cs",
+                    .dsl => "ds", .dsh => "ds",
+                    .esl => "es", .esh => "es",
+                    .ssl => "ss", .ssh => "ss",
+                    .ipl => "ip", .iph => "ip",
+                    .fll => "flags", .flh => "flags",
+                }
+            });
+        }
+    }
+};
+pub const MemoryMode = enum {
+    direct,
+    bx_si, bx_di, bp_si, bp_di, 
+    si, di, bp, bx,
+
+    pub fn format(self: MemoryMode, writer: *std.io.Writer) std.io.Writer.Error!void {
+        try writer.print("{s}", .{ 
+            switch (self) {
+                .direct => "",
+                .bx_si => "bx+si", .bx_di => "bx+di",
+                .bp_si => "bp+si", .bp_di => "bp+di",
+                .si => "si", .di => "di", .bp => "bp", .bx => "bx",
+            } 
+        });
+    }
 };
 pub const OperandMemory = struct {
-    rfid: RegisterFileId,
-    mode: enum(u4) {
-        direct,
-        bx_si, bx_di, bp_si, bp_di, 
-        si, di, bp, bx,
-    },
+    // Note: size should always be 2.
+    segment: OperandRegister,
+    mode: MemoryMode,
     displacement: u16,
 };
 pub const Operand = union(enum) {
@@ -62,6 +94,57 @@ pub const Flags = packed struct {
 };
 
 pub fn format(self: Self, writer: *std.io.Writer) std.io.Writer.Error!void {
-    // TODO: Figure out source and dest.
-    try writer.print("{s} {s}, {s}", .{ @tagName(self.operation), @tagName(self.operands[0].register.rfid), @tagName(self.operands[1].register.rfid) });
+    if (self.operation == .segment or self.operation == .rep or self.operation == .lock) {
+        return;
+    }
+
+    try writer.print("{s}", .{ if (self.flags.lock) "lock " else "" });
+    try writer.print("{s}", .{ if (self.flags.rep) "rep " else "" });
+    try writer.print("{s}", .{ @tagName(self.operation) });
+    try writer.print("{s} ", .{ 
+        if (self.flags.rep and self.flags.wide) "w"
+        else if (self.flags.rep and !self.flags.wide) "b"
+        else ""
+    });
+
+    // nasm expects xchg operands to be in different order.
+    const operands: [2]Operand = .{
+        if (self.flags.lock and self.operation == .xchg) self.operands[1] else self.operands[0],
+        if (self.flags.lock and self.operation == .xchg) self.operands[0] else self.operands[1],
+    };
+
+    for(operands, 0..) |operand, idx| {
+        switch(operand) {
+            .none => {},
+            .register => |register| {
+                try writer.print("{f}", .{ register });
+            },
+            .memory => |memory| {
+                if(operands[0] != .register) {
+                    try writer.print("{s} ", .{ if(self.flags.wide) "word" else "byte" });
+                }
+                if(self.flags.segment) {
+                    try writer.print("{f}", .{ memory.segment });
+                }
+
+                try writer.print("[{f}", .{ memory.mode });
+                if(memory.displacement != 0) {
+                    try writer.print("{d}", .{ memory.displacement });
+                }
+                try writer.print("]", .{});
+            },
+            .immediate => |immediate| {
+                try writer.print("{d}", .{ immediate });
+            },
+            .relative_immediate => |rel_immediate| {
+                try writer.print("${d}", .{ rel_immediate });
+            },
+        }
+
+        if(idx == 0 and operands[1] != .none) {
+            try writer.print(", ", .{});
+        }
+    }
+
+    try writer.print("\n", .{ });
 }

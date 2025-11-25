@@ -97,7 +97,7 @@ test "decode" {
             std.debug.print("## actual:\n", .{});
             std.debug.dumpHex(bin_actual);
             std.debug.print("## new output:\n", .{});
-            std.debug.print("{f}\n", .{ instruction });
+            std.debug.print("{f}", .{ instruction });
             std.debug.print("## diff:\n", .{});
             dumpTextDiff(asm_expected, asm_actual);
         }
