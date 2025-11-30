@@ -2,6 +2,7 @@ const std = @import("std");
 const computer_enhance = @import("computer_enhance");
 const part1 = @import("part1/8086.zig");
 const Decoder = @import("sim86/Decoder.zig");
+const Instruction = @import("sim86/Instruction.zig");
 
 
 pub fn main() !void {
@@ -81,7 +82,7 @@ test "decode" {
 
         // TODO: The new code!
         var decoder: Decoder = .{};
-        const instruction, _ = decoder.decode(bin_expected);
+        const instructions: []Instruction = try decoder.disAsm(gpa, bin_expected);
 
         var nasm = std.process.Child.init(&[_][]const u8{ "nasm", asm_actual_file }, gpa);
         try nasm.spawn();
@@ -97,7 +98,9 @@ test "decode" {
             std.debug.print("## actual:\n", .{});
             std.debug.dumpHex(bin_actual);
             std.debug.print("## new output:\n", .{});
-            std.debug.print("{f}", .{ instruction });
+            for(instructions) |instr| {
+                std.debug.print("{f}", .{ instr });
+            }
             std.debug.print("## diff:\n", .{});
             dumpTextDiff(asm_expected, asm_actual);
         }

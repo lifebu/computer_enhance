@@ -11,8 +11,23 @@ pub const Context = struct {
     flags: Instruction.Flags = .{},
 };
 
-pub fn decode(self: *Self, memory: []u8) struct{ Instruction, []u8} {
+pub fn disAsm(self: *Self, alloc: std.mem.Allocator, memory: []u8) ![]Instruction {
+    var result = try std.ArrayList(Instruction).initCapacity(alloc, 100);
+    defer result.deinit(alloc);
+    
+    var view: []u8 = memory;
+    while(view.len != 0) {
+        const instr: Instruction = self.decode(memory);
+        try result.append(alloc, instr);
+        view = view[instr.size_byte..];
+    }
+
+    return result.toOwnedSlice(alloc);
+}
+
+pub fn decode(self: *Self, memory: []u8) Instruction {
     _ = self;
+    _ = memory;
     // mov cx, bx
     const result: Instruction = .{  
         .address = 0, 
@@ -26,5 +41,5 @@ pub fn decode(self: *Self, memory: []u8) struct{ Instruction, []u8} {
             .wide = true,
         },  
     };
-    return .{ result, memory };
+    return result;
 }
