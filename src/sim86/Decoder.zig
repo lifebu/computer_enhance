@@ -31,20 +31,50 @@ pub fn disAsm(self: *Self, alloc: std.mem.Allocator, memory: []u8) ![]u8 {
 }
 
 pub fn decode(self: *Self, memory: []u8) Instruction {
-    _ = self;
-    _ = memory;
-    // mov cx, bx
-    const result: Instruction = .{  
+    for(format.Table) |elem| {
+        if(self.tryDecode(elem, memory)) |result| return result; 
+    }
+
+    // TODO: If we don't find an actual format this need to error out.
+
+    // mov dx, bx
+    const fallback: Instruction = .{  
         .address = 0, 
         .size_byte = 1, 
         .operation =  .mov,
         .operands = .{ 
-            .{ .register = Instruction.OperandRegister{ .rfid = .cl, .size = 2 } },
+            .{ .register = Instruction.OperandRegister{ .rfid = .dl, .size = 2 } },
             .{ .register = Instruction.OperandRegister{ .rfid = .bl, .size = 2 } },
         }, 
         .flags = .{
             .wide = true,
         },  
     };
-    return result;
+    return fallback;
+}
+
+fn tryDecode(self: *Self, instr_format: format.Format, memory: []u8) ?Instruction {
+    // const result: Instruction = .{};
+    //
+    // // TODO: Write that better.
+    // switch (result.operation) {
+    //     .lock => {
+    //         self.ctx.flags.lock = true;
+    //     },
+    //     .rep => {
+    //         self.ctx.flags.rep = true;
+    //     },
+    //     .segment => {
+    //         self.ctx.flags.segment = true;
+    //         self.ctx.default_segment = result.operands[1].register.rfid;
+    //     },
+    //     else => {
+    //         self.ctx = .{};
+    //     },
+    // }
+
+    _ = self;
+    _ = memory;
+    _ = instr_format;
+    return null;
 }
