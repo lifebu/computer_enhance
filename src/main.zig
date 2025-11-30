@@ -40,12 +40,16 @@ fn dumpTextDiff(expected: []const u8, actual: []const u8) void {
     var actual_lines = std.mem.splitScalar(u8, actual, '\n');
 
     while(expected_lines.peek() != null or actual_lines.peek() != null) {
-        const expected_line = if(expected_lines.next()) |nxt| nxt else "";
+        const expected_line = if(expected_lines.next()) |nxt| nxt else "_";
         if(std.mem.startsWith(u8, expected_line, ";") or expected_line.len == 0) {
             continue;
         }
 
-        const actual_line = if(actual_lines.next()) |nxt| nxt else "";
+        const actual_line = if(actual_lines.next()) |nxt| nxt else "_";
+        if(actual_line.len == 0) {
+            continue;
+        }
+
         const is_equal: bool = std.mem.eql(u8, expected_line, actual_line);
         const divider = if(is_equal) " " else "|";
 
@@ -75,14 +79,10 @@ test "decode" {
         const asm_expected = try std.fs.cwd().readFileAlloc(gpa, asm_file, std.math.maxInt(u32));
         defer gpa.free(asm_expected);
 
-        // TODO: Do that for each line (first create instructions struct, then print to buffer).
-        const asm_actual: []u8 = try part1.writeMnemonic(gpa, bin_expected);
+        var decoder: Decoder = .{};
+        const asm_actual: []u8 = try decoder.disAsm(gpa, bin_expected);
         defer gpa.free(asm_actual);
         try std.fs.cwd().writeFile(.{ .data = asm_actual, .sub_path = asm_actual_file, .flags = .{} });
-
-        // TODO: The new code!
-        var decoder: Decoder = .{};
-        const instructions: []Instruction = try decoder.disAsm(gpa, bin_expected);
 
         var nasm = std.process.Child.init(&[_][]const u8{ "nasm", asm_actual_file }, gpa);
         try nasm.spawn();
@@ -97,10 +97,6 @@ test "decode" {
             std.debug.dumpHex(bin_expected);
             std.debug.print("## actual:\n", .{});
             std.debug.dumpHex(bin_actual);
-            std.debug.print("## new output:\n", .{});
-            for(instructions) |instr| {
-                std.debug.print("{f}", .{ instr });
-            }
             std.debug.print("## diff:\n", .{});
             dumpTextDiff(asm_expected, asm_actual);
         }

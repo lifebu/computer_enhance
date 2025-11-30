@@ -1,4 +1,6 @@
 const std = @import("std");
+const assert = std.debug.assert;
+
 const Instruction = @import("Instruction.zig");
 const format = @import("format_table.zig");
 
@@ -11,14 +13,17 @@ pub const Context = struct {
     flags: Instruction.Flags = .{},
 };
 
-pub fn disAsm(self: *Self, alloc: std.mem.Allocator, memory: []u8) ![]Instruction {
-    var result = try std.ArrayList(Instruction).initCapacity(alloc, 100);
+pub fn disAsm(self: *Self, alloc: std.mem.Allocator, memory: []u8) ![]u8 {
+    var result = try std.ArrayList(u8).initCapacity(alloc, 100);
     defer result.deinit(alloc);
-    
+
+    try result.print(alloc, "bits 16\n", .{});
+
     var view: []u8 = memory;
     while(view.len != 0) {
         const instr: Instruction = self.decode(memory);
-        try result.append(alloc, instr);
+        assert(instr.size_byte > 0); // decoded zero length instruction?
+        try result.print(alloc, "{f}", .{ instr });
         view = view[instr.size_byte..];
     }
 
@@ -31,7 +36,7 @@ pub fn decode(self: *Self, memory: []u8) Instruction {
     // mov cx, bx
     const result: Instruction = .{  
         .address = 0, 
-        .size_byte = 0, 
+        .size_byte = 1, 
         .operation =  .mov,
         .operands = .{ 
             .{ .register = Instruction.OperandRegister{ .rfid = .cl, .size = 2 } },
