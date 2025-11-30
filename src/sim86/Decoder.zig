@@ -53,8 +53,34 @@ pub fn decode(self: *Self, memory: []u8) Instruction {
     return fallback;
 }
 
-fn tryDecode(self: *Self, instr_format: format.Format, memory: []u8) ?Instruction {
+fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
     // const result: Instruction = .{};
+    //
+    // var is_valid: bool = true;
+    // var mem_idx: u8 = 0;
+    // var bits_to_read: u8 = 0;
+    // var bits_pending: u8 = 0;
+    //
+    // for(fmt.fields) |field| {
+    //     var read: u8 = if(field.value) |val| val else 0;
+    //     if(field.bit_count != 0) {
+    //         if(bits_pending == 0) {
+    //             bits_pending = 8;
+    //             bits_to_read = memory[mem_idx];
+    //             mem_idx += 1;
+    //         }
+    //
+    //         assert(field.bit_count <= bits_pending); // bits straddling byte boundaries not allowed.
+    //         bits_pending -= field.bit_count;
+    //         read = (bits_to_read >> bits_pending) & (0xff << field.bit_count);
+    //     }
+    //
+    //     if(field.usage == .literal) {
+    //         is_valid = is_valid and (read == field.value);
+    //     } else {
+    //
+    //     }
+    // }
     //
     // // TODO: Write that better.
     // switch (result.operation) {
@@ -74,7 +100,7 @@ fn tryDecode(self: *Self, instr_format: format.Format, memory: []u8) ?Instructio
     // }
 
     _ = self;
+    _ = fmt;
     _ = memory;
-    _ = instr_format;
     return null;
 }
