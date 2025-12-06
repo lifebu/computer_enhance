@@ -12,6 +12,7 @@ operands: [2]Operand,
 flags: Flags,
 
 pub const RegisterFileId = enum(u5) {
+    // TODO: Need to match the order as casey did it.
     al, ah, // ax (u16), al, ah: (u8)
     cl, ch, // cx (u16), cl, ch: (u8)
     dl, dh, // dx (u16), dl, dh: (u8)
@@ -77,7 +78,7 @@ pub const OperandMemory = struct {
     // Note: size should always be 2.
     segment: OperandRegister,
     mode: MemoryMode,
-    displacement: u16,
+    displacement: i16,
 };
 pub const Operand = union(enum) {
     none: void,

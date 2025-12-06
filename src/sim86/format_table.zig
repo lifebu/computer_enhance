@@ -2,21 +2,23 @@ const std = @import("std");
 const assert = std.debug.assert;
 const def = @import("defines.zig");
 
-pub const FieldBits = struct {
-    usage: enum {
-        literal,
-        mod, reg, rm,
-        sr, disp, data,
+// TODO: Rename to FieldUsage
+pub const FieldType = enum {
+    literal,
+    mod, reg, rm,
+    segment_reg, disp, data,
 
-        has_disp, wide_disp,
-        has_data, wide_for_data,
-        wide_rm,
-        jr_disp,
-        d, s, w, v, z,
-    },
+    has_disp, wide_disp,
+    has_data, wide_for_data,
+    wide_rm,
+    jr_disp,
+    reg_dest, sign, wide, v, z,
+};
+pub const FieldBits = struct {
+    usage: FieldType,
     bit_count: u3,
     // TODO: What is shift here?
-    shift: u8 = 0,
+    shift: u3 = 0,
     value: ?u8 = null,
 };
 pub const Format = struct {
@@ -29,8 +31,8 @@ fn literal(bits: []const u8) FieldBits {
     comptime assert(parsed != .failure);
     return .{ .usage = .literal, .value = @intCast(parsed.int), .bit_count = bits.len };
 }
-const d: FieldBits = .{ .usage = .d, .bit_count = 1 }; 
-const w: FieldBits = .{ .usage = .w, .bit_count = 1 }; 
+const d: FieldBits = .{ .usage = .reg_dest, .bit_count = 1 }; 
+const w: FieldBits = .{ .usage = .wide, .bit_count = 1 }; 
 const mod: FieldBits = .{ .usage = .mod, .bit_count = 2 }; 
 const reg: FieldBits = .{ .usage = .reg, .bit_count = 3 }; 
 const rm: FieldBits = .{ .usage = .rm, .bit_count = 3 }; 
