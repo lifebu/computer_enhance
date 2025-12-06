@@ -193,7 +193,7 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
             } else {
                 const is_direct_addr: bool = (mod == 0b00) and (rm == 0b110);
                 // TODO: This 1 + RM looks pretty uggly
-                const mode: Instruction.MemoryMode = if(is_direct_addr) Instruction.MemoryMode.direct else @enumFromInt(1 + rm);
+                const mode: Instruction.MemoryMode = if(is_direct_addr) Instruction.MemoryMode.direct else @enumFromInt(1 + @as(u5, rm));
                 mod_operand = .{ .memory = .{
                     .displacement = disp,
                     .mode = mode,
