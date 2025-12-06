@@ -90,9 +90,9 @@ const FieldResult = struct {
     sign: bool = false,
     wide: bool = false,
     v: ?bool = null,
-    z: ?u8 = null,
+    z: ?bool = null,
     
-    fn fromUsage(self: *FieldResult, usage: format.FieldType, value: u8) void {
+    fn fromUsage(self: *FieldResult, usage: format.FieldUsage, value: u8) void {
         switch (usage) {
             .literal => self.literal = value,
             .rm => self.rm = @intCast(value),
@@ -109,7 +109,7 @@ const FieldResult = struct {
             .sign => self.sign = value != 0,
             .wide => self.wide = value != 0,
             .v => self.v = value != 0,
-            .z => self.z = value,
+            .z => self.z = value == 0,
             .data => {},
             .disp => {},
         }
