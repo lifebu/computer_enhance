@@ -67,8 +67,8 @@ pub const MemoryMode = enum {
         try writer.print("{s}", .{ 
             switch (self) {
                 .direct => "",
-                .bx_si => "bx+si", .bx_di => "bx+di",
-                .bp_si => "bp+si", .bp_di => "bp+di",
+                .bx_si => "bx + si", .bx_di => "bx + di",
+                .bp_si => "bp + si", .bp_di => "bp + di",
                 .si => "si", .di => "di", .bp => "bp", .bx => "bx",
             } 
         });
@@ -130,7 +130,7 @@ pub fn format(self: Self, writer: *std.io.Writer) std.io.Writer.Error!void {
 
                 try writer.print("[{f}", .{ memory.mode });
                 if(memory.displacement != 0) {
-                    try writer.print("{d}", .{ memory.displacement });
+                    try writer.print(" + {d}", .{ memory.displacement });
                 }
                 try writer.print("]", .{});
             },

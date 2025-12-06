@@ -22,7 +22,10 @@ pub fn disAsm(self: *Self, alloc: std.mem.Allocator, memory: []u8) ![]u8 {
     var instr_idx: usize = 0;
     var view: []u8 = memory;
     while(view.len != 0) {
-        const instr: Instruction = self.decode(view);
+        const instr: Instruction = self.decode(view) orelse {
+            std.debug.print("No fitting instruction found at idx: {}\n", .{ instr_idx });
+            unreachable;
+        };
         assert(instr.size_byte > 0); // decoded zero length instruction?
         try result.print(alloc, "{f}", .{ instr });
         view = view[instr.size_byte..];
@@ -32,11 +35,11 @@ pub fn disAsm(self: *Self, alloc: std.mem.Allocator, memory: []u8) ![]u8 {
     return result.toOwnedSlice(alloc);
 }
 
-pub fn decode(self: *Self, memory: []u8) Instruction {
+pub fn decode(self: *Self, memory: []u8) ?Instruction {
     for(format.Table) |elem| {
         if(self.tryDecode(elem, memory)) |result| return result; 
     }
-    unreachable; // No fitting instruction found!
+    return null;
 }
 
 fn parseData(memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_extended: bool) ?u16 {
@@ -205,29 +208,28 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
             .address = 0, // TODO: How to do that? Instead of subslicing input memory I would need to have memory and an incoming memory_idx.
             .size_byte = @intCast(mem_idx),
             .operands = .{ 
-                // TODO: This might not work for some of the strange instructions (jr_disp), where we need one of them to be .none
                 if(reg_dest) reg_operand else mod_operand,
                 if(reg_dest) mod_operand else reg_operand,
             }, 
         };
 
         // Some opcodes need immediates as operands => use the operand that has not bee in used so far.
-        const unused_operand: *Instruction.Operand = if(result.operands[0] != .none) &result.operands[0] else &result.operands[1];
+        const unused_operand: *Instruction.Operand = if(result.operands[0] == .none) &result.operands[0] else &result.operands[1];
         if(field_result.jr_disp) {
-            unused_operand.relative_immediate = disp + result.size_byte;
+            unused_operand.* = .{ .relative_immediate = disp + result.size_byte };
         }
         if(field_result.has_data) {
-            unused_operand.immediate = field_result.data orelse 0;
+            unused_operand.* = .{ .immediate = field_result.data orelse 0 };
         }
         if(field_result.v) |v_value| {
             if(v_value) {
-                unused_operand.register = Instruction.OperandRegister {
+                unused_operand.* = .{ .register = .{
                     .rfid = .cl,
                     .size = 1,
-                };
+                } };
             } else {
                 // TODO: Casey had a "immediate s32"?
-                unused_operand.immediate = 1;
+                unused_operand.* = .{ .immediate = 1 };
             }
         }
 
