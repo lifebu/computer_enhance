@@ -138,7 +138,13 @@ pub fn format(self: Self, writer: *std.io.Writer) std.io.Writer.Error!void {
                 try writer.print("{d}", .{ immediate });
             },
             .relative_immediate => |rel_immediate| {
-                try writer.print("${d}", .{ rel_immediate });
+                if(rel_immediate >= 0) {
+                    // TODO: This is required for nasm to create the correct binary for relative jumps
+                    // Can we do this nicer in formatting? Having a format if the number is >= 0 add a + and if it is < 0 add a -?
+                    try writer.print("$+{d}", .{ rel_immediate });
+                } else {
+                    try writer.print("${d}", .{ rel_immediate });
+                }
             },
         }
 

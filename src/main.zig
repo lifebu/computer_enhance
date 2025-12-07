@@ -45,7 +45,11 @@ fn dumpTextDiff(expected: []const u8, actual: []const u8) void {
             continue;
         }
 
-        const actual_line = if(actual_lines.next()) |nxt| nxt else "_";
+        var actual_line = if(actual_lines.next()) |nxt| nxt else "_";
+        if(std.mem.endsWith(u8, expected_line, ":")) {
+            // to align outputs with labels.
+            actual_line = expected_line;
+        }
         if(actual_line.len == 0) {
             continue;
         }
@@ -59,21 +63,21 @@ fn dumpTextDiff(expected: []const u8, actual: []const u8) void {
 
 test "decode" {
     const gpa = std.testing.allocator;
-    const test_folder = "upstream/perfaware/part1/";
     const bin_actual_file = "results/result";
     const asm_actual_file = "results/result.asm";
     const test_names = [_][]const u8{
-        "listing_0037_single_register_mov",
-        "listing_0038_many_register_mov",
-        "listing_0039_more_movs",
-        "listing_0040_challenge_movs",
-        //"listing_0041_add_sub_cmp_jnz",
-        //"listing_0042_completionist_decode",
+        "test_data/add_sub_cmp",
+        "test_data/jnz",
+        "upstream/perfaware/part1/listing_0037_single_register_mov",
+        "upstream/perfaware/part1/listing_0038_many_register_mov",
+        "upstream/perfaware/part1/listing_0039_more_movs",
+        "upstream/perfaware/part1/listing_0040_challenge_movs",
+        "upstream/perfaware/part1/listing_0041_add_sub_cmp_jnz",
+        //"upstream/perfaware/part1/listing_0042_completionist_decode",
     };
 
     for (test_names, 0..) |test_name, test_idx| {
-        const bin_file = try std.fmt.allocPrint(gpa, "{s}{s}", .{ test_folder, test_name });
-        defer gpa.free(bin_file);
+        const bin_file = test_name;
         const bin_expected = try std.fs.cwd().readFileAlloc(gpa, bin_file, std.math.maxInt(u32));
         defer gpa.free(bin_expected);
 
