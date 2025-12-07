@@ -45,6 +45,7 @@ pub fn decode(self: *Self, memory: []u8) ?Instruction {
     return null;
 }
 
+// TODO: out parameter for the index: A good case for the segmented access and not the sliding window view I used so far (see disAsm()).
 fn parse(T: type, memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_extended: bool) ?T {
     const int_info: std.builtin.Type.Int = @typeInfo(T).int;
     _ = sign_extended; // TODO: What is this? Don't know if we need this? Casey uses it to cast u8 value to i8 (i think)
@@ -52,7 +53,6 @@ fn parse(T: type, memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_
     return if (exists) {
         if (is_wide) {
             const word_type = @Type(std.builtin.Type{ .int = .{ .signedness = .unsigned, .bits = int_info.bits } });
-            // TODO: This looks like a good case for the segmented access and not the sliding window view I used so far.
             const unsigend: word_type = memory[mem_idx.*] | (@as(u16, memory[mem_idx.* + 1]) << 8);
             const result: T = @bitCast(unsigend);
             mem_idx.* += 2;
@@ -70,14 +70,14 @@ fn parse(T: type, memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_
 fn getRegOperand(value: u3, is_wide: bool) Instruction.Operand {
     const size: u2 = if(is_wide) 2 else 1;
     return switch(value) {
-        0 => .{ .register = Instruction.OperandRegister{ .rfid = .al, .size = size } },
-        1 => .{ .register = Instruction.OperandRegister{ .rfid = .cl, .size = size } },
-        2 => .{ .register = Instruction.OperandRegister{ .rfid = .dl, .size = size } },
-        3 => .{ .register = Instruction.OperandRegister{ .rfid = .bl, .size = size } },
-        4 => .{ .register = Instruction.OperandRegister{ .rfid = if(is_wide) .spl else .ah, .size = size } },
-        5 => .{ .register = Instruction.OperandRegister{ .rfid = if(is_wide) .bpl else .ch, .size = size } },
-        6 => .{ .register = Instruction.OperandRegister{ .rfid = if(is_wide) .sil else .dh, .size = size } },
-        7 => .{ .register = Instruction.OperandRegister{ .rfid = if(is_wide) .dil else .bh, .size = size } },
+        0 => .{ .register = .{ .rfid = .al, .size = size } },
+        1 => .{ .register = .{ .rfid = .cl, .size = size } },
+        2 => .{ .register = .{ .rfid = .dl, .size = size } },
+        3 => .{ .register = .{ .rfid = .bl, .size = size } },
+        4 => .{ .register = .{ .rfid = if(is_wide) .spl else .ah, .size = size } },
+        5 => .{ .register = .{ .rfid = if(is_wide) .bpl else .ch, .size = size } },
+        6 => .{ .register = .{ .rfid = if(is_wide) .sil else .dh, .size = size } },
+        7 => .{ .register = .{ .rfid = if(is_wide) .dil else .bh, .size = size } },
     };
 }
 
@@ -101,7 +101,7 @@ const FieldResult = struct {
     v: ?bool = null,
     z: ?bool = null,
     
-    fn fromUsage(self: *FieldResult, usage: format.FieldUsage, value: u8) void {
+    fn readAs(self: *FieldResult, value: u8, usage: format.FieldUsage) void {
         switch (usage) {
             .literal => self.literal = value,
             .rm => self.rm = @intCast(value),
@@ -150,7 +150,7 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
     // TODO: If we make this "bits_removed", we might be able to make this u3 and save the cast below?
     var bits_pending: u8 = 0;
 
-    const is_matching: bool = for(fmt.fields) |field| {
+    for(fmt.fields) |field| {
         var read: ?u8 = if(field.value) |val| val else null;
         if(field.bit_count != 0) {
             if(bits_pending == 0) {
@@ -168,36 +168,32 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
         }
 
         if(field.usage == .literal and read != field.value) {
-            break false; // format does not match to memory.
+            return null; // format does not match to memory.
         } else if(read != null) {
-            FieldResult.fromUsage(&field_result, field.usage, read.?);
+            field_result.readAs(read.?, field.usage);
         }
-
-    } else true;
-
-    if(!is_matching) {
-        return null;
     }
 
     const mod = field_result.mod orelse 0;
     const rm = field_result.rm orelse 0;
 
+    // disp
     const has_direct_addr: bool = (mod == 0b00) and (rm == 0b110);
     const has_disp: bool = field_result.has_disp or (mod == 0b10) or (mod == 0b01) or has_direct_addr;
     const has_wide_disp: bool = field_result.wide_disp or (mod == 0b10) or has_direct_addr;
+    field_result.disp = parse(i16, memory, &mem_idx, has_disp, has_wide_disp, !has_wide_disp);
+    const disp: i16 = field_result.disp orelse 0;
+
+    // data
     const has_data: bool = field_result.has_data;
     const has_wide_data: bool = (field_result.wide_for_data) and !field_result.sign and field_result.wide;
-
-    field_result.disp = parse(i16, memory, &mem_idx, has_disp, has_wide_disp, !has_wide_disp);
     field_result.data = parse(u16, memory, &mem_idx, has_data, has_wide_data, field_result.sign);
 
+    // flags
     var result_flags = self.ctx.flags;
     result_flags.wide |= field_result.wide;
 
-    // TODO: is disp always signed 16 bits?
-    const disp: i16 = @bitCast(field_result.disp orelse 0);
-    // const reg_operand_idx: u1 = if(reg_dest) 0 else 1;
-    // const mod_operand_idx: u1 = if(reg_dest) 1 else 0;
+    // operands
     var reg_operand: Instruction.Operand = .none;
     var mod_operand: Instruction.Operand = .none;
 
@@ -238,7 +234,7 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
         }, 
     };
 
-    // Some opcodes need immediates as operands => use the operand that has not bee in used so far.
+    // Some opcodes need immediates as operands => use the operand that has not been in use so far.
     const unused_operand: *Instruction.Operand = if(result.operands[0] == .none) &result.operands[0] else &result.operands[1];
     if(field_result.jr_disp) {
         unused_operand.* = .{ .relative_immediate = disp + result.size_byte };
