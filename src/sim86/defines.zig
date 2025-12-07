@@ -37,6 +37,10 @@ const RegisterFile = packed union {
         si: u16, // source index
         di: u16, // dest index
     },
+    // TODO: Add Segment registers (cs, ds, ss, es): p.24.
+    // TODO: Add IP register and Flags.
+    // TODO: Use IP instead of the views in the decoder.
+    // TODO: Make sure RegisterFileId matches the RegisterFile.
     r8: packed struct {
         al: u8, ah: u8,
         cl: u8, ch: u8,

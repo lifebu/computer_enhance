@@ -33,6 +33,7 @@ zig build run -- upstream/perfaware/part1/listing_0039_more_movs > result.asm &&
 ## Doc
 https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 - P.160 Decoding.
+- p.42 flags:
     
 - 16-bit Registers. Memory-to-Register Movement.
     => Register names have 16-bit (AX), high-8-bit (AH) and low-8-bit variants (AL).

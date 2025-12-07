@@ -13,17 +13,17 @@ flags: Flags,
 
 pub const RegisterFileId = enum(u5) {
     al, ah, // ax (u16), al, ah: (u8)
+    bl, bh, // bx (u16), bl, bh: (u8)
     cl, ch, // cx (u16), cl, ch: (u8)
     dl, dh, // dx (u16), dl, dh: (u8)
-    bl, bh, // bx (u16), bl, bh: (u8)
     spl, sph, // stack pointer: u16,
     bpl, bph, // base pointer: u16,
     sil, sih, // source index: u16,
     dil, dih, // dest index: u16,
     csl, csh, // code segment: u16,
     dsl, dsh, // data segment: u16,
-    esl, esh, // extra segment: u16,
     ssl, ssh, // stack segment: u16,
+    esl, esh, // extra segment: u16,
     ipl, iph, // instruction pointer: u16,
     fll, flh, // flags register: u16,
 };
