@@ -195,64 +195,54 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
 
     // operands
     var reg_operand: Instruction.Operand = .none;
-    var mod_operand: Instruction.Operand = .none;
-
     if(field_result.segment_reg) |segment_offset| {
-        // TODO: How to do that better? I like Casey solution more, way easier.
         const rfid_int: u5 = @intFromEnum(Instruction.RegisterFileId.esl) + (2 * @as(u4, segment_offset));
         reg_operand = .{ .register = .{ .rfid = @enumFromInt(rfid_int), .size = 2 } };
-    }
-
-    if(field_result.reg) |reg_value| {
+    } else if(field_result.reg) |reg_value| {
         reg_operand = getRegOperand(reg_value, field_result.wide);
     }
 
+    var mod_operand: Instruction.Operand = .none;
     if(field_result.mod) |mod_value| {
         if(mod_value == 0b11) {
             const mod_wide: bool = field_result.wide or field_result.wide_rm;
             mod_operand = getRegOperand(rm, mod_wide);
         } else {
-            const is_direct_addr: bool = (mod == 0b00) and (rm == 0b110);
-            // TODO: This 1 + RM looks pretty uggly
-            const mode: Instruction.MemoryMode = if(is_direct_addr) Instruction.MemoryMode.direct else @enumFromInt(1 + @as(u5, rm));
+            const mode_int: u5 = 1 + @as(u5, rm);
             mod_operand = .{ .memory = .{
                 .displacement = disp,
-                .mode = mode,
+                .mode = if(has_direct_addr) .direct else @enumFromInt(mode_int),
                 .segment = .{ .size = 2, .rfid = self.ctx.default_segment },
             } };
         }
     }
 
-    var result: Instruction = .{
-        .operation = fmt.operation,
-        .flags = result_flags,
-        .address = 0, // TODO: How to do that? Instead of subslicing input memory I would need to have memory and an incoming memory_idx.
-        .size_byte = @intCast(mem_idx),
-        .operands = .{ 
-            if(field_result.reg_dest) reg_operand else mod_operand,
-            if(field_result.reg_dest) mod_operand else reg_operand,
-        }, 
-    };
+    var first_operand = if(field_result.reg_dest) reg_operand else mod_operand;
+    var second_operand = if(field_result.reg_dest) mod_operand else reg_operand;
+    const size_byte: u3 = @intCast(mem_idx);
 
     // Some opcodes need immediates as operands => use the operand that has not been in use so far.
-    const unused_operand: *Instruction.Operand = if(result.operands[0] == .none) &result.operands[0] else &result.operands[1];
+    const unused_operand: *Instruction.Operand = if(first_operand == .none) &first_operand else &second_operand;
     if(field_result.jr_disp) {
-        unused_operand.* = .{ .relative_immediate = disp + result.size_byte };
-    }
-    if(field_result.has_data) {
+        unused_operand.* = .{ .relative_immediate = disp + size_byte };
+    } else if(field_result.has_data) {
         unused_operand.* = .{ .immediate = field_result.data orelse 0 };
-    }
-    if(field_result.v) |v_value| {
-        if(v_value) {
-            unused_operand.* = .{ .register = .{
-                .rfid = .cl,
-                .size = 1,
-            } };
-        } else {
-            // TODO: Casey had a "immediate s32"?
-            unused_operand.* = .{ .immediate = 1 };
-        }
+    } else if(field_result.v != null and field_result.v.?) {
+        unused_operand.* = .{ .register = .{ .rfid = .cl, .size = 1, } };
+    } else if(field_result.v != null and !field_result.v.?) {
+        // TODO: Casey had a "immediate s32"?
+        unused_operand.* = .{ .immediate = 1 };
     }
 
-    return result;
+    return Instruction {
+        .operation = fmt.operation,
+        .flags = result_flags,
+        // TODO: How to do that? Instead of subslicing input memory I would need to have memory and an incoming memory_idx.
+        .address = 0, 
+        .size_byte = size_byte,
+        .operands = .{ 
+            first_operand,
+            second_operand,
+        }, 
+    };
 }

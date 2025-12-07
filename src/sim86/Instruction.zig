@@ -57,7 +57,7 @@ pub const OperandRegister = struct {
         }
     }
 };
-pub const MemoryMode = enum {
+pub const MemoryMode = enum(u5) {
     direct,
     bx_si, bx_di, bp_si, bp_di, 
     si, di, bp, bx,
