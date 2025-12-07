@@ -24,6 +24,10 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
 
+    // llvm backend required for vscode debug symbols.
+    const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
+    exe.use_llvm = enable_llvm;
+
     // run
     const run_step = b.step("run", "Run the app");
     const run_cmd = b.addRunArtifact(exe);
