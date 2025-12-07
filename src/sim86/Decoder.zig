@@ -36,13 +36,14 @@ pub fn disAsm(self: *Self, alloc: std.mem.Allocator, memory: []u8) ![]u8 {
 }
 
 pub fn decode(self: *Self, memory: []u8) ?Instruction {
-    for(format.Table) |elem| {
+    for(format.Table, 0..) |elem, table_idx| {
+        _ = table_idx;
         if(self.tryDecode(elem, memory)) |result| return result; 
     }
     return null;
 }
 
-fn parseData(memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_extended: bool) ?u16 {
+fn parseu16(memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_extended: bool) ?u16 {
     _ = sign_extended; // TODO: What is this? Don't know if we need this? Casey uses it to cast u8 value to i8 (i think)
     return if (exists) {
         if (is_wide) {
@@ -52,6 +53,22 @@ fn parseData(memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_exten
             return result;
         } else {
             const result: u8 = memory[mem_idx.*];
+            mem_idx.* += 1;
+            return result;
+        }
+    } else null;
+}
+fn parsei16(memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_extended: bool) ?i16 {
+    _ = sign_extended; // TODO: What is this? Don't know if we need this? Casey uses it to cast u8 value to i8 (i think)
+    return if (exists) {
+        if (is_wide) {
+            // TODO: This usecase would probably be better to have this "SegmentedAccess" class from casey!
+            const unsigend: u16 = memory[mem_idx.*] | (@as(u16, memory[mem_idx.* + 1]) << 8);
+            const result: i16 = @bitCast(unsigend);
+            mem_idx.* += 2;
+            return result;
+        } else {
+            const result: i8 = @bitCast(memory[mem_idx.*]);
             mem_idx.* += 1;
             return result;
         }
@@ -78,7 +95,7 @@ const FieldResult = struct {
     reg: ?u3 = null,
     rm: ?u3 = null,
     segment_reg: ?u2 = null,
-    disp: ?u16 = null,
+    disp: ?i16 = null,
     data: ?u16 = null,
     has_disp: bool = false,
     wide_disp: bool = false,
@@ -164,8 +181,8 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
         const has_data: bool = field_result.has_data;
         const has_wide_data: bool = (field_result.wide_for_data) and !sign and wide;
 
-        field_result.disp = parseData(memory, &mem_idx, has_disp, has_wide_disp, !has_wide_disp);
-        field_result.data = parseData(memory, &mem_idx, has_data, has_wide_data, sign);
+        field_result.disp = parsei16(memory, &mem_idx, has_disp, has_wide_disp, !has_wide_disp);
+        field_result.data = parseu16(memory, &mem_idx, has_data, has_wide_data, sign);
 
         var result_flags = self.ctx.flags;
         result_flags.wide |= wide;
