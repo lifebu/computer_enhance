@@ -36,18 +36,21 @@ pub fn disAsm(self: *Self, alloc: std.mem.Allocator, memory: []u8) ![]u8 {
 }
 
 pub fn decode(self: *Self, memory: []u8) ?Instruction {
-    for(format.Table, 0..) |elem, table_idx| {
-        _ = table_idx;
-        if(self.tryDecode(elem, memory)) |result| return result; 
+    for(format.Table) |elem| {
+        if(self.tryDecode(elem, memory)) |result| {
+            self.updateContext(result);
+            return result; 
+        }
     }
     return null;
 }
 
+// TODO: Combine both methods?
 fn parseu16(memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_extended: bool) ?u16 {
     _ = sign_extended; // TODO: What is this? Don't know if we need this? Casey uses it to cast u8 value to i8 (i think)
     return if (exists) {
         if (is_wide) {
-            // TODO: This usecase would probably be better to have this "SegmentedAccess" class from casey!
+            // TODO: This looks like a good case for the segmented access and not the sliding window view I used so far.
             const result: u16 = memory[mem_idx.*] | (@as(u16, memory[mem_idx.* + 1]) << 8);
             mem_idx.* += 2;
             return result;
@@ -133,17 +136,32 @@ const FieldResult = struct {
     }
 };
 
+fn updateContext(self: *Self, result: Instruction) void {
+    switch (result.operation) {
+        .lock => {
+            self.ctx.flags.lock = true;
+        },
+        .rep => {
+            self.ctx.flags.rep = true;
+        },
+        .segment => {
+            self.ctx.flags.segment = true;
+            self.ctx.default_segment = result.operands[1].register.rfid;
+        },
+        else => {
+            self.ctx = .{};
+        },
+    }
+}
+
 fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
     var field_result: FieldResult = .{};
-    var is_valid: bool = true;
     var mem_idx: u8 = 0;
     var bits_to_read: u8 = 0;
     // TODO: If we make this "bits_removed", we might be able to make this u3 and save the cast below?
     var bits_pending: u8 = 0;
 
-    for(fmt.fields) |field| {
-        if(!is_valid) break;
-
+    const is_matching: bool = for(fmt.fields) |field| {
         var read: ?u8 = if(field.value) |val| val else null;
         if(field.bit_count != 0) {
             if(bits_pending == 0) {
@@ -160,115 +178,96 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
             read = (bits_to_read >> shift) & mask;
         }
 
-        if(field.usage == .literal) {
-            is_valid = is_valid and (read == field.value);
+        if(field.usage == .literal and read != field.value) {
+            break false; // format does not match to memory.
         } else if(read != null) {
             FieldResult.fromUsage(&field_result, field.usage, read.?);
         }
+
+    } else true;
+
+    if(!is_matching) {
+        return null;
     }
 
-    if(is_valid) {
-        // TODO: Does zig have a "NamedArray"? (a set of elements I can access with an enum)?
-        const mod = field_result.mod orelse 0;
-        const rm = field_result.rm orelse 0;
-        const wide = field_result.wide;
-        const sign = field_result.sign;
-        const reg_dest = field_result.reg_dest;
+    const mod = field_result.mod orelse 0;
+    const rm = field_result.rm orelse 0;
 
-        const has_direct_addr: bool = (mod == 0b00) and (rm == 0b110);
-        const has_disp: bool = field_result.has_disp or (mod == 0b10) or (mod == 0b01) or has_direct_addr;
-        const has_wide_disp: bool = field_result.wide_disp or (mod == 0b10) or has_direct_addr;
-        const has_data: bool = field_result.has_data;
-        const has_wide_data: bool = (field_result.wide_for_data) and !sign and wide;
+    const has_direct_addr: bool = (mod == 0b00) and (rm == 0b110);
+    const has_disp: bool = field_result.has_disp or (mod == 0b10) or (mod == 0b01) or has_direct_addr;
+    const has_wide_disp: bool = field_result.wide_disp or (mod == 0b10) or has_direct_addr;
+    const has_data: bool = field_result.has_data;
+    const has_wide_data: bool = (field_result.wide_for_data) and !field_result.sign and field_result.wide;
 
-        field_result.disp = parsei16(memory, &mem_idx, has_disp, has_wide_disp, !has_wide_disp);
-        field_result.data = parseu16(memory, &mem_idx, has_data, has_wide_data, sign);
+    field_result.disp = parsei16(memory, &mem_idx, has_disp, has_wide_disp, !has_wide_disp);
+    field_result.data = parseu16(memory, &mem_idx, has_data, has_wide_data, field_result.sign);
 
-        var result_flags = self.ctx.flags;
-        result_flags.wide |= wide;
+    var result_flags = self.ctx.flags;
+    result_flags.wide |= field_result.wide;
 
-        // TODO: is disp always signed 16 bits?
-        const disp: i16 = @bitCast(field_result.disp orelse 0);
-        // const reg_operand_idx: u1 = if(reg_dest) 0 else 1;
-        // const mod_operand_idx: u1 = if(reg_dest) 1 else 0;
-        var reg_operand: Instruction.Operand = .none;
-        var mod_operand: Instruction.Operand = .none;
+    // TODO: is disp always signed 16 bits?
+    const disp: i16 = @bitCast(field_result.disp orelse 0);
+    // const reg_operand_idx: u1 = if(reg_dest) 0 else 1;
+    // const mod_operand_idx: u1 = if(reg_dest) 1 else 0;
+    var reg_operand: Instruction.Operand = .none;
+    var mod_operand: Instruction.Operand = .none;
 
-        if(field_result.segment_reg) |segment_offset| {
-            // TODO: How to do that better? I like Casey solution more, way easier.
-            const rfid_int: u5 = @intFromEnum(Instruction.RegisterFileId.esl) + (2 * @as(u4, segment_offset));
-            reg_operand = .{ .register = .{ .rfid = @enumFromInt(rfid_int), .size = 2 } };
-        }
-
-        if(field_result.reg) |reg_value| {
-            reg_operand = getRegOperand(reg_value, wide);
-        }
-
-        if(field_result.mod) |mod_value| {
-            if(mod_value == 0b11) {
-                const mod_wide: bool = wide or field_result.wide_rm;
-                mod_operand = getRegOperand(rm, mod_wide);
-            } else {
-                const is_direct_addr: bool = (mod == 0b00) and (rm == 0b110);
-                // TODO: This 1 + RM looks pretty uggly
-                const mode: Instruction.MemoryMode = if(is_direct_addr) Instruction.MemoryMode.direct else @enumFromInt(1 + @as(u5, rm));
-                mod_operand = .{ .memory = .{
-                    .displacement = disp,
-                    .mode = mode,
-                    .segment = .{ .size = 2, .rfid = self.ctx.default_segment },
-                } };
-            }
-        }
-
-        var result: Instruction = .{
-            .operation = fmt.operation,
-            .flags = result_flags,
-            .address = 0, // TODO: How to do that? Instead of subslicing input memory I would need to have memory and an incoming memory_idx.
-            .size_byte = @intCast(mem_idx),
-            .operands = .{ 
-                if(reg_dest) reg_operand else mod_operand,
-                if(reg_dest) mod_operand else reg_operand,
-            }, 
-        };
-
-        // Some opcodes need immediates as operands => use the operand that has not bee in used so far.
-        const unused_operand: *Instruction.Operand = if(result.operands[0] == .none) &result.operands[0] else &result.operands[1];
-        if(field_result.jr_disp) {
-            unused_operand.* = .{ .relative_immediate = disp + result.size_byte };
-        }
-        if(field_result.has_data) {
-            unused_operand.* = .{ .immediate = field_result.data orelse 0 };
-        }
-        if(field_result.v) |v_value| {
-            if(v_value) {
-                unused_operand.* = .{ .register = .{
-                    .rfid = .cl,
-                    .size = 1,
-                } };
-            } else {
-                // TODO: Casey had a "immediate s32"?
-                unused_operand.* = .{ .immediate = 1 };
-            }
-        }
-
-        switch (result.operation) {
-            .lock => {
-                self.ctx.flags.lock = true;
-            },
-            .rep => {
-                self.ctx.flags.rep = true;
-            },
-            .segment => {
-                self.ctx.flags.segment = true;
-                self.ctx.default_segment = result.operands[1].register.rfid;
-            },
-            else => {
-                self.ctx = .{};
-            },
-        }
-
-        return result;
+    if(field_result.segment_reg) |segment_offset| {
+        // TODO: How to do that better? I like Casey solution more, way easier.
+        const rfid_int: u5 = @intFromEnum(Instruction.RegisterFileId.esl) + (2 * @as(u4, segment_offset));
+        reg_operand = .{ .register = .{ .rfid = @enumFromInt(rfid_int), .size = 2 } };
     }
 
-    return null;
+    if(field_result.reg) |reg_value| {
+        reg_operand = getRegOperand(reg_value, field_result.wide);
+    }
+
+    if(field_result.mod) |mod_value| {
+        if(mod_value == 0b11) {
+            const mod_wide: bool = field_result.wide or field_result.wide_rm;
+            mod_operand = getRegOperand(rm, mod_wide);
+        } else {
+            const is_direct_addr: bool = (mod == 0b00) and (rm == 0b110);
+            // TODO: This 1 + RM looks pretty uggly
+            const mode: Instruction.MemoryMode = if(is_direct_addr) Instruction.MemoryMode.direct else @enumFromInt(1 + @as(u5, rm));
+            mod_operand = .{ .memory = .{
+                .displacement = disp,
+                .mode = mode,
+                .segment = .{ .size = 2, .rfid = self.ctx.default_segment },
+            } };
+        }
+    }
+
+    var result: Instruction = .{
+        .operation = fmt.operation,
+        .flags = result_flags,
+        .address = 0, // TODO: How to do that? Instead of subslicing input memory I would need to have memory and an incoming memory_idx.
+        .size_byte = @intCast(mem_idx),
+        .operands = .{ 
+            if(field_result.reg_dest) reg_operand else mod_operand,
+            if(field_result.reg_dest) mod_operand else reg_operand,
+        }, 
+    };
+
+    // Some opcodes need immediates as operands => use the operand that has not bee in used so far.
+    const unused_operand: *Instruction.Operand = if(result.operands[0] == .none) &result.operands[0] else &result.operands[1];
+    if(field_result.jr_disp) {
+        unused_operand.* = .{ .relative_immediate = disp + result.size_byte };
+    }
+    if(field_result.has_data) {
+        unused_operand.* = .{ .immediate = field_result.data orelse 0 };
+    }
+    if(field_result.v) |v_value| {
+        if(v_value) {
+            unused_operand.* = .{ .register = .{
+                .rfid = .cl,
+                .size = 1,
+            } };
+        } else {
+            // TODO: Casey had a "immediate s32"?
+            unused_operand.* = .{ .immediate = 1 };
+        }
+    }
+
+    return result;
 }

@@ -12,7 +12,6 @@ operands: [2]Operand,
 flags: Flags,
 
 pub const RegisterFileId = enum(u5) {
-    // TODO: Need to match the order as casey did it.
     al, ah, // ax (u16), al, ah: (u8)
     cl, ch, // cx (u16), cl, ch: (u8)
     dl, dh, // dx (u16), dl, dh: (u8)
@@ -138,13 +137,7 @@ pub fn format(self: Self, writer: *std.io.Writer) std.io.Writer.Error!void {
                 try writer.print("{d}", .{ immediate });
             },
             .relative_immediate => |rel_immediate| {
-                if(rel_immediate >= 0) {
-                    // TODO: This is required for nasm to create the correct binary for relative jumps
-                    // Can we do this nicer in formatting? Having a format if the number is >= 0 add a + and if it is < 0 add a -?
-                    try writer.print("$+{d}", .{ rel_immediate });
-                } else {
-                    try writer.print("${d}", .{ rel_immediate });
-                }
+                try writer.print("${s}{d}", .{ if(rel_immediate >= 0) "+" else "", rel_immediate });
             },
         }
 

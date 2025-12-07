@@ -1,6 +1,5 @@
 # TODO
 ## Decoder cleanup
-- Instruction.zig
 - Decoder.zig
 
 # Curr
