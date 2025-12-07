@@ -1,12 +1,10 @@
 const std = @import("std");
 const computer_enhance = @import("computer_enhance");
-const part1 = @import("part1/8086.zig");
 const Decoder = @import("sim86/Decoder.zig");
 const Instruction = @import("sim86/Instruction.zig");
 
 
 pub fn main() !void {
-    // TODO: compile asm as part of build process?
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
@@ -24,9 +22,9 @@ pub fn main() !void {
         const contents = try std.fs.cwd().readFileAlloc(alloc, path_relative, 1024);
         defer alloc.free(contents);
 
-        const result: []u8 = try part1.writeMnemonic(alloc, contents);
+        var decoder: Decoder = .{};
+        const result: []u8 = try decoder.disAsm(alloc, contents);
         defer alloc.free(result);
-
 
         try stdout.interface.print("{s}", .{ result });
         try stdout.interface.flush();

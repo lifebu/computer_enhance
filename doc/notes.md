@@ -1,3 +1,8 @@
+# TODO
+## Decoder cleanup
+- Instruction.zig
+- Decoder.zig
+
 # Curr
 https://www.computerenhance.com/p/table-of-contents
 - Decoding Multiple INstructions and Suffixes

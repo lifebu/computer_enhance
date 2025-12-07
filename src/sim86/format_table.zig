@@ -16,7 +16,6 @@ pub const FieldUsage = enum {
 pub const FieldBits = struct {
     usage: FieldUsage,
     bit_count: u4,
-    // TODO: What is shift here?
     shift: u3 = 0,
     value: ?u8 = null,
 };
