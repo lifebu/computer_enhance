@@ -138,7 +138,8 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
             assert(field.bit_count <= bits_pending); // bits straddling byte boundaries not allowed.
             bits_pending -= field.bit_count;
             const shift: u3 = @intCast(bits_pending); // cast is save: we remove field.bit_count and it is not zero => bits_pending < 8
-            const mask = ~(@as(u8, 0xff) << field.bit_count);
+            // TODO: bit_count can be 8, so this code no longer can compiles without this hack :/
+            const mask = if(field.bit_count > 7) 0xff else ~(@as(u8, 0xff) << @as(u3, @intCast(field.bit_count)));
             read = (bits_to_read >> shift) & mask;
         }
 
