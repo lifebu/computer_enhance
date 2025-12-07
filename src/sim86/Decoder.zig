@@ -81,7 +81,7 @@ fn getRegOperand(value: u3, is_wide: bool) Instruction.Operand {
     };
 }
 
-const FieldResult = struct {
+const Fields = struct {
     literal: ?u8 = null,
     mod: ?u2 = null,
     reg: ?u3 = null,
@@ -101,7 +101,7 @@ const FieldResult = struct {
     v: ?bool = null,
     z: ?bool = null,
     
-    fn readAs(self: *FieldResult, value: u8, usage: format.FieldUsage) void {
+    fn readAs(self: *Fields, value: u8, usage: format.FieldUsage) void {
         switch (usage) {
             .literal => self.literal = value,
             .rm => self.rm = @intCast(value),
@@ -144,68 +144,68 @@ fn updateContext(self: *Self, result: Instruction) void {
 }
 
 fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
-    var field_result: FieldResult = .{};
+    var fields: Fields = .{};
     var mem_idx: u8 = 0;
-    var bits_to_read: u8 = 0;
-    // TODO: If we make this "bits_removed", we might be able to make this u3 and save the cast below?
-    var bits_pending: u8 = 0;
 
+    var read_byte: u8 = 0;
+    var bits_pending: u4 = 0;
     for(fmt.fields) |field| {
-        var read: ?u8 = if(field.value) |val| val else null;
+        var read: ?u8 = field.value orelse null;
         if(field.bit_count != 0) {
             if(bits_pending == 0) {
                 bits_pending = 8;
-                bits_to_read = memory[mem_idx];
+                read_byte = memory[mem_idx];
                 mem_idx += 1;
             }
 
             assert(field.bit_count <= bits_pending); // bits straddling byte boundaries not allowed.
             bits_pending -= field.bit_count;
-            const shift: u3 = @intCast(bits_pending); // cast is save: we remove field.bit_count and it is not zero => bits_pending < 8
-            // TODO: bit_count can be 8, so this code no longer can compiles without this hack :/
-            const mask = if(field.bit_count > 7) 0xff else ~(@as(u8, 0xff) << @as(u3, @intCast(field.bit_count)));
-            read = (bits_to_read >> shift) & mask;
+            const shift: u3 = @intCast(bits_pending);
+            const mask = if (field.bit_count > 7) 0xff else (@as(u8, 1) << @intCast(field.bit_count)) - 1;
+            read = (read_byte >> shift) & mask;
         }
 
         if(field.usage == .literal and read != field.value) {
             return null; // format does not match to memory.
-        } else if(read != null) {
-            field_result.readAs(read.?, field.usage);
+        } else {
+            assert(read != null);
+            fields.readAs(read.?, field.usage);
         }
     }
+    assert(bits_pending == 0); // No bits were unused
 
-    const mod = field_result.mod orelse 0;
-    const rm = field_result.rm orelse 0;
+    const mod = fields.mod orelse 0;
+    const rm = fields.rm orelse 0;
 
     // disp
     const has_direct_addr: bool = (mod == 0b00) and (rm == 0b110);
-    const has_disp: bool = field_result.has_disp or (mod == 0b10) or (mod == 0b01) or has_direct_addr;
-    const has_wide_disp: bool = field_result.wide_disp or (mod == 0b10) or has_direct_addr;
-    field_result.disp = parse(i16, memory, &mem_idx, has_disp, has_wide_disp, !has_wide_disp);
-    const disp: i16 = field_result.disp orelse 0;
+    const has_disp: bool = fields.has_disp or (mod == 0b10) or (mod == 0b01) or has_direct_addr;
+    const has_wide_disp: bool = fields.wide_disp or (mod == 0b10) or has_direct_addr;
+    fields.disp = parse(i16, memory, &mem_idx, has_disp, has_wide_disp, !has_wide_disp);
+    const disp: i16 = fields.disp orelse 0;
 
     // data
-    const has_data: bool = field_result.has_data;
-    const has_wide_data: bool = (field_result.wide_for_data) and !field_result.sign and field_result.wide;
-    field_result.data = parse(u16, memory, &mem_idx, has_data, has_wide_data, field_result.sign);
+    const has_data: bool = fields.has_data;
+    const has_wide_data: bool = (fields.wide_for_data) and !fields.sign and fields.wide;
+    fields.data = parse(u16, memory, &mem_idx, has_data, has_wide_data, fields.sign);
 
     // flags
     var result_flags = self.ctx.flags;
-    result_flags.wide |= field_result.wide;
+    result_flags.wide |= fields.wide;
 
     // operands
     var reg_operand: Instruction.Operand = .none;
-    if(field_result.segment_reg) |segment_offset| {
+    if(fields.segment_reg) |segment_offset| {
         const rfid_int: u5 = @intFromEnum(Instruction.RegisterFileId.esl) + (2 * @as(u4, segment_offset));
         reg_operand = .{ .register = .{ .rfid = @enumFromInt(rfid_int), .size = 2 } };
-    } else if(field_result.reg) |reg_value| {
-        reg_operand = getRegOperand(reg_value, field_result.wide);
+    } else if(fields.reg) |reg_value| {
+        reg_operand = getRegOperand(reg_value, fields.wide);
     }
 
     var mod_operand: Instruction.Operand = .none;
-    if(field_result.mod) |mod_value| {
+    if(fields.mod) |mod_value| {
         if(mod_value == 0b11) {
-            const mod_wide: bool = field_result.wide or field_result.wide_rm;
+            const mod_wide: bool = fields.wide or fields.wide_rm;
             mod_operand = getRegOperand(rm, mod_wide);
         } else {
             const mode_int: u5 = 1 + @as(u5, rm);
@@ -217,19 +217,19 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
         }
     }
 
-    var first_operand = if(field_result.reg_dest) reg_operand else mod_operand;
-    var second_operand = if(field_result.reg_dest) mod_operand else reg_operand;
+    var first_operand = if(fields.reg_dest) reg_operand else mod_operand;
+    var second_operand = if(fields.reg_dest) mod_operand else reg_operand;
     const size_byte: u3 = @intCast(mem_idx);
 
     // Some opcodes need immediates as operands => use the operand that has not been in use so far.
     const unused_operand: *Instruction.Operand = if(first_operand == .none) &first_operand else &second_operand;
-    if(field_result.jr_disp) {
+    if(fields.jr_disp) {
         unused_operand.* = .{ .relative_immediate = disp + size_byte };
-    } else if(field_result.has_data) {
-        unused_operand.* = .{ .immediate = field_result.data orelse 0 };
-    } else if(field_result.v != null and field_result.v.?) {
+    } else if(fields.has_data) {
+        unused_operand.* = .{ .immediate = fields.data orelse 0 };
+    } else if(fields.v != null and fields.v.?) {
         unused_operand.* = .{ .register = .{ .rfid = .cl, .size = 1, } };
-    } else if(field_result.v != null and !field_result.v.?) {
+    } else if(fields.v != null and !fields.v.?) {
         // TODO: Casey had a "immediate s32"?
         unused_operand.* = .{ .immediate = 1 };
     }
