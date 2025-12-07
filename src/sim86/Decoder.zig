@@ -45,33 +45,22 @@ pub fn decode(self: *Self, memory: []u8) ?Instruction {
     return null;
 }
 
-// TODO: Combine both methods?
-fn parseu16(memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_extended: bool) ?u16 {
+fn parse(T: type, memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_extended: bool) ?T {
+    const int_info: std.builtin.Type.Int = @typeInfo(T).int;
     _ = sign_extended; // TODO: What is this? Don't know if we need this? Casey uses it to cast u8 value to i8 (i think)
+
     return if (exists) {
         if (is_wide) {
+            const word_type = @Type(std.builtin.Type{ .int = .{ .signedness = .unsigned, .bits = int_info.bits } });
             // TODO: This looks like a good case for the segmented access and not the sliding window view I used so far.
-            const result: u16 = memory[mem_idx.*] | (@as(u16, memory[mem_idx.* + 1]) << 8);
+            const unsigend: word_type = memory[mem_idx.*] | (@as(u16, memory[mem_idx.* + 1]) << 8);
+            const result: T = @bitCast(unsigend);
             mem_idx.* += 2;
             return result;
         } else {
-            const result: u8 = memory[mem_idx.*];
-            mem_idx.* += 1;
-            return result;
-        }
-    } else null;
-}
-fn parsei16(memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_extended: bool) ?i16 {
-    _ = sign_extended; // TODO: What is this? Don't know if we need this? Casey uses it to cast u8 value to i8 (i think)
-    return if (exists) {
-        if (is_wide) {
-            // TODO: This usecase would probably be better to have this "SegmentedAccess" class from casey!
-            const unsigend: u16 = memory[mem_idx.*] | (@as(u16, memory[mem_idx.* + 1]) << 8);
-            const result: i16 = @bitCast(unsigend);
-            mem_idx.* += 2;
-            return result;
-        } else {
-            const result: i8 = @bitCast(memory[mem_idx.*]);
+            const byte_type = @Type(std.builtin.Type{ .int = .{ .signedness = int_info.signedness, .bits = 8 } });
+            const unsigned: u8 = memory[mem_idx.*];
+            const result: byte_type = @bitCast(unsigned);
             mem_idx.* += 1;
             return result;
         }
@@ -199,8 +188,8 @@ fn tryDecode(self: *Self, fmt: format.Format, memory: []u8) ?Instruction {
     const has_data: bool = field_result.has_data;
     const has_wide_data: bool = (field_result.wide_for_data) and !field_result.sign and field_result.wide;
 
-    field_result.disp = parsei16(memory, &mem_idx, has_disp, has_wide_disp, !has_wide_disp);
-    field_result.data = parseu16(memory, &mem_idx, has_data, has_wide_data, field_result.sign);
+    field_result.disp = parse(i16, memory, &mem_idx, has_disp, has_wide_disp, !has_wide_disp);
+    field_result.data = parse(u16, memory, &mem_idx, has_data, has_wide_data, field_result.sign);
 
     var result_flags = self.ctx.flags;
     result_flags.wide |= field_result.wide;
