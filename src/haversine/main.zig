@@ -2,6 +2,8 @@ const std = @import("std");
 const builtin = @import("builtin");
 const assert = std.debug.assert;
 
+const generator = @import("generator.zig");
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -29,6 +31,7 @@ pub fn main() !void {
                 const seed: u64 = try std.fmt.parseInt(u64, args.next().?, 10);
                 const num_coords: u64 = try std.fmt.parseInt(u64, args.next().?, 10);
                 try stdout.interface.print("generate: use clusters: {}, seed: {}, num_coords: {}\n", .{ use_clusters, seed, num_coords });
+                try generator.generateHaversine(use_clusters, seed, num_coords);
             }
         } else {
             try stdout.interface.print("Unknown command: {s}\n", .{ command });

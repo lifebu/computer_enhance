@@ -29,7 +29,10 @@
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/computer_enhance",
             "args": [
-                "upstream/perfaware/part1/listing_0039_more_movs",
+                "gen",
+                "cluster",
+                "123456",
+                "1000",
             ],
             //"stopAtEntry": false,
             "cwd": "${workspaceFolder}",
