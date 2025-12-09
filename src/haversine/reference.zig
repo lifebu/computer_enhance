@@ -1,7 +1,7 @@
 const std = @import("std");
 
 // earth_radius expected to be 6372.8
-pub fn referenceHaversine(x0: f64, y0: f64, x1: f64, y1: f64, earth_radius: f64) void {
+pub fn referenceHaversine(x0: f64, y0: f64, x1: f64, y1: f64, earth_radius: f64) f64 {
     const lat_delta: f64 = std.math.degreesToRadians(y1 - y0);
     const lon_delta: f64 = std.math.degreesToRadians(x1 - x0);
     const lat1_rad: f64 = std.math.degreesToRadians(y0);
