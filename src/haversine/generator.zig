@@ -21,7 +21,7 @@ pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64
     }
 
     const json_path = "results/haversine.json";
-    const result_path = "results/result.f64";
+    const result_path = "results/haversine.f64";
 
     const json_file = try std.fs.cwd().createFile(json_path, .{});
     defer json_file.close();
@@ -62,7 +62,6 @@ pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64
             center_y = rng.genRange(-max_y, max_y);
             radius_x = rng.genRange(0, max_x);
             radius_y = rng.genRange(0, max_y);
-            std.debug.print("cluster: ({}, {})-({},{})\n", .{ center_x, center_y, radius_x, radius_y });
         }
 
         const x0: f64 = rng.genDegree(center_x, radius_x, max_x);

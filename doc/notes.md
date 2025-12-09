@@ -69,3 +69,9 @@ https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 # Part2: Haversine
 ## Code
 https://github.com/cmuratori/computer_enhance
+- listing 0065: haversine_formula
+
+### Writing a Simple Haversine Distance Processor.
+- Need to write a json parser for my input.
+- Two ways: Json as input => Generates the answer.
+    - Json and Answer as input => Generates the answer and validates:

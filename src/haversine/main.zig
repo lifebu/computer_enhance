@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const assert = std.debug.assert;
 
+const calculator = @import("calculator.zig");
 const generator = @import("generator.zig");
 
 pub fn main() !void {
@@ -33,11 +34,21 @@ pub fn main() !void {
                 try stdout.interface.print("generate: use clusters: {}, seed: {}, num_coords: {}\n", .{ use_clusters, seed, num_coords });
                 try generator.generateHaversine(alloc, use_clusters, seed, num_coords);
             }
+        } else if(std.mem.eql(u8, command, "calc")) {
+            const json_file: ?[:0]const u8 = args.next();
+            if(json_file == null) {
+                try stdout.interface.print("[haversine_input.json]\n", .{});
+                try stdout.interface.print("[haversine_input.json] [answers.f64]\n", .{});
+            } else {
+                const answer_file: []const u8 = args.next() orelse "";
+                try calculator.calculateHaversine(alloc, json_file.?, answer_file);
+            }
+
         } else {
             try stdout.interface.print("Unknown command: {s}\n", .{ command });
         }
     } else {
-        try stdout.interface.print("Error: No file specified\n", .{ });
+        try stdout.interface.print("Error: No command specified. use gen or calc\n", .{ });
     }
 
     try stdout.interface.flush();
