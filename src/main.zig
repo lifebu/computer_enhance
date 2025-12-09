@@ -7,13 +7,13 @@ const sim86 = @import("sim86/main.zig");
 const haversine = @import("haversine/main.zig");
 
 const project_sim86 = "sim86";
-const project_haversine = "sim86";
-const project = project_sim86;
+const project_haversine = "haversine";
+const project = project_haversine;
 
 pub fn main() !void {
-    if (project == project_sim86) {
+    if (std.mem.eql(u8, project, project_sim86)) {
         try sim86.main();
-    } else if (project == project_haversine) {
+    } else if (std.mem.eql(u8, project, project_haversine)) {
         try haversine.main();
     } else {
         std.debug.print("NO PROJECT LOADED???\n", .{});

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -26,7 +27,7 @@ pub fn build(b: *std.Build) void {
 
     // llvm backend required for vscode debug symbols.
     const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
-    exe.use_llvm = enable_llvm;
+    exe.use_llvm = if(builtin.os.tag == .windows) true else enable_llvm;
 
     // run
     const run_step = b.step("run", "Run the app");

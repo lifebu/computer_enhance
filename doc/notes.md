@@ -65,3 +65,7 @@ https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 - Conditional Jump:
     - First byte: Patterns states which kind of jump (JNZ).
     - Second byte is 8-bit displacement.
+
+# Part2: Haversine
+## Code
+https://github.com/cmuratori/computer_enhance
