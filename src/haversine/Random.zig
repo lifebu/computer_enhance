@@ -7,7 +7,9 @@ const Self = @This();
 a: u64, b: u64, c: u64, d: u64,
 
 pub fn init(seed: u64) Self {
-    var result: Self = .{ .a = 0xf1ea5eed, .b = seed, .c = seed, .d = seed };
+    var result: Self = .{ 
+        .a = 0xf1ea5eed, .b = seed, .c = seed, .d = seed 
+    };
     for(0..20) |_| {
         _ = result.genU64();
     }

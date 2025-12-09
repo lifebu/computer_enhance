@@ -31,8 +31,8 @@
             "args": [
                 "gen",
                 "cluster",
-                "123456",
-                "1000",
+                "34589343434893",
+                "100000",
             ],
             //"stopAtEntry": false,
             "cwd": "${workspaceFolder}",

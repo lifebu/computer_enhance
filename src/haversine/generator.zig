@@ -12,8 +12,7 @@ const HaversineData = struct {
     pairs: []const HaversinePairs,
 };
 
-// TODO:
-// generate json file that has an array of pairs. a pair has x0, y0, x1, y1 floats
+// TODO: Generate some testdata with caseys reference implementation and test this code!
 pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64, num_coords: u64) !void {
     const limit: u64 = 1 << 34;
     if(num_coords > limit) {
@@ -55,13 +54,15 @@ pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64
     const cluster_max = 1 + (num_coords / 64);
 
     for(0..num_coords) |_| {
+        const cluster_value: u64 = clusters_left;
         clusters_left -%= 1;
-        if(clusters_left <= 0) {
+        if(cluster_value <= 0) {
             clusters_left = cluster_max;
             center_x = rng.genRange(-max_x, max_x);
             center_y = rng.genRange(-max_y, max_y);
             radius_x = rng.genRange(0, max_x);
             radius_y = rng.genRange(0, max_y);
+            std.debug.print("cluster: ({}, {})-({},{})\n", .{ center_x, center_y, radius_x, radius_y });
         }
 
         const x0: f64 = rng.genDegree(center_x, radius_x, max_x);
@@ -69,19 +70,19 @@ pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64
         const x1: f64 = rng.genDegree(center_x, radius_x, max_x);
         const y1: f64 = rng.genDegree(center_y, radius_y, max_y);
         const distance: f64 = reference.referenceHaversine(x0, y0, x1, y1, earth_radius);
+
         sum += sum_coef * distance;
 
         const new_pair: *HaversinePairs = try pair_list.addOne(alloc);
         new_pair.* = HaversinePairs{ .x0 = x0, .y0 = y0, .x1 = x1, .y1 = y1 };
-        // TODO: We should write bytes not strings!
-        try result_writer.interface.print("{}\n", .{ distance });
+        try result_writer.interface.writeAll(&std.mem.toBytes(distance));
     }
+
     json_data.pairs = pair_list.items;
     const jsonFormatter = std.json.fmt(json_data, .{ .whitespace = .indent_tab });
     try jsonFormatter.format(&json_writer.interface);
 
-    // TODO: We should write bytes not strings!
-    try result_writer.interface.print("{}\n", .{ sum });
+    try result_writer.interface.writeAll(&std.mem.toBytes(sum));
 
     try json_writer.end();
     try result_writer.end();
