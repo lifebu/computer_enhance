@@ -3,10 +3,16 @@ const assert = std.debug.assert;
 
 const def = @import("defines.zig");
 const Json = @import("Json.zig");
+const reference = @import("reference.zig");
 
 // TODO:
 // Write json parser for the input file and do the haversine calculation.
 pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answer_file: []const u8) !void {
+    var haversine_data: def.HaversineData = .{
+        .pairs = try alloc.alloc(def.HaversinePairs, 100),
+    };
+    defer alloc.free(haversine_data.pairs);
+
     std.debug.print("json file: {s}\n", .{ json_file });
     const json_data = try std.fs.cwd().readFileAlloc(alloc, json_file, std.math.maxInt(u32));
     defer alloc.free(json_data);
@@ -18,25 +24,32 @@ pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answe
     var pair_idx: usize = 0;
     var json_pairs: ?*Json = if(json_parent != null) json_parent.?.first_child else null;
     while(json_pairs) |json_elem| : ({ json_pairs = json_pairs.?.next_sibling; pair_idx += 1; }) {
-        if(pair_idx > std.math.maxInt(u32)) {
+        if(pair_idx > def.max_haversine) {
             break;
         }
+        assert(pair_idx < haversine_data.pairs.len); // We ran out of memory!
 
         const x0: f64 = json_elem.element("x0", f64);
         const x1: f64 = json_elem.element("x1", f64);
         const y0: f64 = json_elem.element("y0", f64);
         const y1: f64 = json_elem.element("y1", f64);
-        // TODO: Have a list of haversines that we fill up!
-        const haversine: def.HaversinePairs = .{ .x0 = x0, .x1 = x1, .y0 = y0, .y1 = y1 };
-        std.debug.print("Parsed Haversine: ({}, {})->({}, {})\n", .{ haversine.x0, haversine.y0, haversine.x1, haversine.y1 });
+        haversine_data.pairs[pair_idx] = .{
+            .x0 = x0, .x1 = x1, .y0 = y0, .y1 = y1
+        };
+        std.debug.print("Parsed Haversine: ({}, {})->({}, {})\n", .{ x0, y0, x1, y1 });
     }
-    
-    const input_size: u64 = 0; // TODO: What is that?
-    const num_coords: u64 = 0;
-    const sum: f64 = 0.0;
+    const pair_count = pair_idx + 1;
 
-    std.debug.print("Input size: {}\n", .{ input_size });
-    std.debug.print("Pair count: {}\n", .{ num_coords });
+    var sum: f64 = 0.0;
+    const sum_coef: f64 = 1.0 / @as(f64, @floatFromInt(pair_count));
+    for(haversine_data.pairs) |pair| {
+        const distance: f64 = reference.referenceHaversine(pair.x0, pair.y0, pair.x1, pair.y1, def.earth_radius);
+        sum += distance * sum_coef;
+    }
+
+    // TODO: Is debug print slower than stdout.print()?
+    std.debug.print("Input size: {}\n", .{ json_data.len });
+    std.debug.print("Pair count: {}\n", .{ pair_count });
     std.debug.print("Haversine sum: {}\n", .{ sum });
 
     const has_answers: bool = answer_file.len != 0;

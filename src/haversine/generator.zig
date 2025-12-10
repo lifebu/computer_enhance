@@ -4,11 +4,9 @@ const def = @import("defines.zig");
 const Random = @import("Random.zig");
 const reference = @import("reference.zig");
 
-// TODO: Generate some testdata with caseys reference implementation and test this code!
 pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64, num_coords: u64) !void {
-    const limit = std.math.maxInt(u32);
-    if(num_coords > limit) {
-        std.debug.print("You can only generate files up to {}!\n", .{ limit });
+    if(num_coords > def.max_haversine) {
+        std.debug.print("You can only generate files up to {}!\n", .{ def.max_haversine });
         return;
     }
 
@@ -33,7 +31,6 @@ pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64
     var pair_list = try std.ArrayList(def.HaversinePairs).initCapacity(alloc, 100);
     defer pair_list.deinit(alloc);
 
-    const earth_radius: f64 = 6372.8;
     const max_x: f64 = 180.0;
     const max_y: f64 = 90.0;
     var center_x: f64 = 0.0;
@@ -60,7 +57,7 @@ pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64
         const y0: f64 = rng.genDegree(center_y, radius_y, max_y);
         const x1: f64 = rng.genDegree(center_x, radius_x, max_x);
         const y1: f64 = rng.genDegree(center_y, radius_y, max_y);
-        const distance: f64 = reference.referenceHaversine(x0, y0, x1, y1, earth_radius);
+        const distance: f64 = reference.referenceHaversine(x0, y0, x1, y1, def.earth_radius);
 
         sum += sum_coef * distance;
 
