@@ -10,13 +10,6 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    var buf: [1024]u8 = undefined;
-    var stdout = std.fs.File.stdout().writer(&buf);
-    // TODO: Don't know why this breaks on windows!
-    if(builtin.os.tag != .windows) {
-        defer stdout.file.unlock();
-    }
-
     var args = try std.process.argsWithAllocator(alloc);
     defer args.deinit();
 
@@ -25,31 +18,29 @@ pub fn main() !void {
         if(std.mem.eql(u8, command, "gen")) {
             const distribution_str: ?[:0]const u8 = args.next();
             if(distribution_str == null) {
-                try stdout.interface.print("[uniform/cluster] [random seed] [number of coordinate pairs to generate]\n", .{});
+                std.log.info("[uniform/cluster] [random seed] [number of coordinate pairs to generate]", .{});
             } else {
                 const use_clusters: bool = std.mem.eql(u8, distribution_str.?, "cluster");
                 assert(use_clusters or std.mem.eql(u8, distribution_str.?, "uniform"));
                 const seed: u64 = try std.fmt.parseInt(u64, args.next().?, 10);
                 const num_coords: u64 = try std.fmt.parseInt(u64, args.next().?, 10);
-                try stdout.interface.print("generate: use clusters: {}, seed: {}, num_coords: {}\n", .{ use_clusters, seed, num_coords });
+                std.log.info("generate: use clusters: {}, seed: {}, num_coords: {}", .{ use_clusters, seed, num_coords });
                 try generator.generateHaversine(alloc, use_clusters, seed, num_coords);
             }
         } else if(std.mem.eql(u8, command, "calc")) {
             const json_file: ?[:0]const u8 = args.next();
             if(json_file == null) {
-                try stdout.interface.print("[haversine_input.json]\n", .{});
-                try stdout.interface.print("[haversine_input.json] [answers.f64]\n", .{});
+                std.log.info("[haversine_input.json]", .{});
+                std.log.info("[haversine_input.json] [answers.f64]", .{});
             } else {
                 const answer_file: []const u8 = args.next() orelse "";
                 try calculator.calculateHaversine(alloc, json_file.?, answer_file);
             }
 
         } else {
-            try stdout.interface.print("Unknown command: {s}\n", .{ command });
+            std.log.err("Unknown command: {s}", .{ command });
         }
     } else {
-        try stdout.interface.print("Error: No command specified. use gen or calc\n", .{ });
+        std.log.err("No command specified. use gen or calc", .{ });
     }
-
-    try stdout.interface.flush();
 }

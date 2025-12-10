@@ -8,14 +8,15 @@ const reference = @import("reference.zig");
 // TODO:
 // Write json parser for the input file and do the haversine calculation.
 pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answer_file: []const u8) !void {
-    var haversine_data: def.HaversineData = .{
-        .pairs = try alloc.alloc(def.HaversinePairs, 100),
-    };
-    defer alloc.free(haversine_data.pairs);
-
-    std.debug.print("json file: {s}\n", .{ json_file });
+    std.log.info("json file: {s}", .{ json_file });
     const json_data = try std.fs.cwd().readFileAlloc(alloc, json_file, std.math.maxInt(u32));
     defer alloc.free(json_data);
+
+    const max_pairs = (json_data.len - 18) / 123; // lower limit found through testing.
+    var haversine_data: def.HaversineData = .{
+        .pairs = try alloc.alloc(def.HaversinePairs, max_pairs),
+    };
+    defer alloc.free(haversine_data.pairs);
 
     const parsed: Json = .init(alloc, json_data);
     defer parsed.deinit();
@@ -36,21 +37,21 @@ pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answe
         haversine_data.pairs[pair_idx] = .{
             .x0 = x0, .x1 = x1, .y0 = y0, .y1 = y1
         };
-        std.debug.print("Parsed Haversine: ({}, {})->({}, {})\n", .{ x0, y0, x1, y1 });
+        std.log.info("Parsed Haversine: ({}, {})->({}, {})", .{ x0, y0, x1, y1 });
     }
-    const pair_count = pair_idx + 1;
+    const pair_count = pair_idx;
 
     var sum: f64 = 0.0;
     const sum_coef: f64 = 1.0 / @as(f64, @floatFromInt(pair_count));
-    for(haversine_data.pairs) |pair| {
+    for(0..pair_count) |idx| {
+        const pair: def.HaversinePairs = haversine_data.pairs[idx];
         const distance: f64 = reference.referenceHaversine(pair.x0, pair.y0, pair.x1, pair.y1, def.earth_radius);
         sum += distance * sum_coef;
     }
 
-    // TODO: Is debug print slower than stdout.print()?
-    std.debug.print("Input size: {}\n", .{ json_data.len });
-    std.debug.print("Pair count: {}\n", .{ pair_count });
-    std.debug.print("Haversine sum: {}\n", .{ sum });
+    std.log.info("Input size: {}", .{ json_data.len });
+    std.log.info("Pair count: {}", .{ pair_count });
+    std.log.info("Haversine sum: {}", .{ sum });
 
     const has_answers: bool = answer_file.len != 0;
     if(has_answers) {
@@ -67,10 +68,9 @@ pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answe
             reference_sum = float;
         }
 
-        std.debug.print("\n", .{});
-        std.debug.print("answer file: {s}\n", .{ answer_file });
-        std.debug.print("Validation:\n", .{});
-        std.debug.print("Reference sum: {}\n", .{ reference_sum });
-        std.debug.print("Difference: {}\n", .{ sum - reference_sum });
+        std.log.info("answer file: {s}", .{ answer_file });
+        std.log.info("Validation:", .{});
+        std.log.info("Reference sum: {}", .{ reference_sum });
+        std.log.info("Difference: {}", .{ sum - reference_sum });
     }
 }

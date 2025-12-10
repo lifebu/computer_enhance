@@ -6,7 +6,7 @@ const reference = @import("reference.zig");
 
 pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64, num_coords: u64) !void {
     if(num_coords > def.max_haversine) {
-        std.debug.print("You can only generate files up to {}!\n", .{ def.max_haversine });
+        std.log.err("You can only generate files up to {}!", .{ def.max_haversine });
         return;
     }
 
@@ -75,8 +75,8 @@ pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64
     try json_writer.end();
     try result_writer.end();
 
-    std.debug.print("Use clusters: {}\n", .{ use_clusters });
-    std.debug.print("Seed: {}\n", .{ seed });
-    std.debug.print("Pair count: {}\n", .{ num_coords });
-    std.debug.print("Expected sum: {}\n", .{ sum });
+    std.log.info("Use clusters: {}", .{ use_clusters });
+    std.log.info("Seed: {}", .{ seed });
+    std.log.info("Pair count: {}", .{ num_coords });
+    std.log.info("Expected sum: {}", .{ sum });
 }
