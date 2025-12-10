@@ -1,6 +1,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
+const def = @import("defines.zig");
 const Json = @import("Json.zig");
 
 // TODO:
@@ -12,6 +13,23 @@ pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answe
 
     const parsed: Json = .init(alloc, json_data);
     defer parsed.deinit();
+
+    const json_parent: ?*Json = parsed.child("pairs");
+    var pair_idx: usize = 0;
+    var json_pairs: ?*Json = if(json_parent != null) json_parent.?.first_child else null;
+    while(json_pairs) |json_elem| : ({ json_pairs = json_pairs.?.next_sibling; pair_idx += 1; }) {
+        if(pair_idx > std.math.maxInt(u32)) {
+            break;
+        }
+
+        const x0: f64 = json_elem.element("x0", f64);
+        const x1: f64 = json_elem.element("x1", f64);
+        const y0: f64 = json_elem.element("y0", f64);
+        const y1: f64 = json_elem.element("y1", f64);
+        // TODO: Have a list of haversines that we fill up!
+        const haversine: def.HaversinePairs = .{ .x0 = x0, .x1 = x1, .y0 = y0, .y1 = y1 };
+        std.debug.print("Parsed Haversine: ({}, {})->({}, {})\n", .{ haversine.x0, haversine.y0, haversine.x1, haversine.y1 });
+    }
     
     const input_size: u64 = 0; // TODO: What is that?
     const num_coords: u64 = 0;

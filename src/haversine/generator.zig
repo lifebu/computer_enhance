@@ -1,20 +1,12 @@
 const std = @import("std");
+
+const def = @import("defines.zig");
 const Random = @import("Random.zig");
 const reference = @import("reference.zig");
 
-const HaversinePairs = struct {
-    x0: f64,
-    y0: f64,
-    x1: f64,
-    y1: f64,
-};
-const HaversineData = struct {
-    pairs: []const HaversinePairs,
-};
-
 // TODO: Generate some testdata with caseys reference implementation and test this code!
 pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64, num_coords: u64) !void {
-    const limit: u64 = 1 << 34;
+    const limit = std.math.maxInt(u32);
     if(num_coords > limit) {
         std.debug.print("You can only generate files up to {}!\n", .{ limit });
         return;
@@ -36,9 +28,9 @@ pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64
     var result_writer: std.fs.File.Writer = result_file.writer(&result_buf);
 
     var rng: Random = .init(seed);
-    var json_data: HaversineData = undefined;
+    var json_data: def.HaversineData = undefined;
 
-    var pair_list = try std.ArrayList(HaversinePairs).initCapacity(alloc, 100);
+    var pair_list = try std.ArrayList(def.HaversinePairs).initCapacity(alloc, 100);
     defer pair_list.deinit(alloc);
 
     const earth_radius: f64 = 6372.8;
@@ -72,8 +64,8 @@ pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64
 
         sum += sum_coef * distance;
 
-        const new_pair: *HaversinePairs = try pair_list.addOne(alloc);
-        new_pair.* = HaversinePairs{ .x0 = x0, .y0 = y0, .x1 = x1, .y1 = y1 };
+        const new_pair: *def.HaversinePairs = try pair_list.addOne(alloc);
+        new_pair.* = def.HaversinePairs{ .x0 = x0, .y0 = y0, .x1 = x1, .y1 = y1 };
         try result_writer.interface.writeAll(&std.mem.toBytes(distance));
     }
 

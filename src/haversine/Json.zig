@@ -22,13 +22,14 @@ pub fn deinit(self: *const Self) void {
     assert(self.is_root);
 } 
 
-pub fn lookupChild(self: Self, name: []const u8) *Self {
+pub fn child(self: Self, name: []const u8) ?*Self {
     _ = self;
     _ = name;
-    return .{};
+    return null;
 }
 
-pub fn convert(self: Self, T: type) T {
+pub fn element(self: Self, name: []const u8, T: type) T {
     _ = self;
-    return .{};
+    _ = name;
+    return 0;
 }
