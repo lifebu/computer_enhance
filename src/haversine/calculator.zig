@@ -18,10 +18,10 @@ pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answe
     };
     defer alloc.free(haversine_data.pairs);
 
-    const parsed: Json = .init(alloc, json_data);
-    defer parsed.deinit();
+    const parsed: Json = try .init(alloc, json_data);
+    defer parsed.deinit(alloc);
 
-    const json_parent: ?*Json = parsed.child("pairs");
+    const json_parent: ?*Json = parsed.getChild("pairs");
     var pair_idx: usize = 0;
     var json_pairs: ?*Json = if(json_parent != null) json_parent.?.first_child else null;
     while(json_pairs) |json_elem| : ({ json_pairs = json_pairs.?.next_sibling; pair_idx += 1; }) {
@@ -30,10 +30,10 @@ pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answe
         }
         assert(pair_idx < haversine_data.pairs.len); // We ran out of memory!
 
-        const x0: f64 = json_elem.element("x0", f64);
-        const x1: f64 = json_elem.element("x1", f64);
-        const y0: f64 = json_elem.element("y0", f64);
-        const y1: f64 = json_elem.element("y1", f64);
+        const x0: f64 = try json_elem.getElem("x0", f64);
+        const x1: f64 = try json_elem.getElem("x1", f64);
+        const y0: f64 = try json_elem.getElem("y0", f64);
+        const y1: f64 = try json_elem.getElem("y1", f64);
         haversine_data.pairs[pair_idx] = .{
             .x0 = x0, .x1 = x1, .y0 = y0, .y1 = y1
         };
