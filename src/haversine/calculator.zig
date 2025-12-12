@@ -19,7 +19,8 @@ pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answe
     defer alloc.free(haversine_data.pairs);
 
     const parsed: Json = try .init(alloc, json_data);
-    defer parsed.deinit(alloc);
+    //defer parsed.deinit(alloc);
+    std.log.info("{f}", .{ parsed });
 
     const json_parent: ?*Json = parsed.getChild("pairs");
     var pair_idx: usize = 0;

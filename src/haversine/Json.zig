@@ -4,8 +4,8 @@ const assert = std.debug.assert;
 const Self = @This();
 
 is_root: bool = false,
-label: []const u8 = undefined,
-value: ?[]const u8 = undefined,
+label: ?[]const u8 = null,
+value: ?[]const u8 = null,
 
 first_child: ?*Self = null,
 next_sibling: ?*Self = null,
@@ -20,24 +20,26 @@ pub fn init(alloc: std.mem.Allocator, buff: []const u8) !Self {
 
 pub fn deinit(self: *const Self, alloc: std.mem.Allocator) void {
     assert(self.is_root); // Only allowed to deallocate the root json object.
-    
+    deinitInner(self, alloc);
+} 
+fn deinitInner(self: *const Self, alloc: std.mem.Allocator) void {
     var curr_child: ?*Self = self.first_child;
     while(curr_child) |child_elem| : (curr_child = curr_child.?.next_sibling) {
-        child_elem.deinit(alloc);
+        child_elem.deinitInner(alloc);
         alloc.destroy(child_elem);
     }
 
     var curr_sibling: ?*Self = self.next_sibling;
     while(curr_sibling) |sibling| : (curr_sibling = curr_sibling.?.next_sibling) {
-        sibling.deinit(alloc);
+        sibling.deinitInner(alloc);
         alloc.destroy(sibling);
     }
-} 
+}
 
 pub fn getChild(self: Self, name: []const u8) ?*Self {
     var curr_child: ?*Self = self.first_child;
     while(curr_child) |child_elem| : (curr_child = curr_child.?.next_sibling) {
-        if(std.mem.eql(u8, child_elem.label, name)) {
+        if(child_elem.label != null and std.mem.eql(u8, child_elem.label.?, name)) {
             return curr_child;
         }
     }
@@ -60,6 +62,29 @@ pub fn getElem(self: Self, name: []const u8, T: type) !T {
     }
 }
 
+pub fn format(self: *const Self, writer: *std.io.Writer) std.io.Writer.Error!void {
+    try formatInner(self, writer, 0);
+}
+fn formatInner(self: *const Self, writer: *std.io.Writer, depth: usize) std.io.Writer.Error!void {
+    assert(depth < std.math.maxInt(u8)); // Deeper than 255 recursions?
+    
+    try writer.print("{*}:", .{ self });
+    for(0..depth) |_| {
+        try writer.print("--", .{});
+    }
+    try writer.print("{s}{s}\n", .{ self.label orelse "", self.value orelse "" });
+
+    var curr_child: ?*Self = self.first_child;
+    while(curr_child) |child_elem| : (curr_child = curr_child.?.next_sibling) {
+        try formatInner(child_elem, writer, depth + 1);
+    }
+
+    var curr_sibling: ?*Self = self.next_sibling;
+    while(curr_sibling) |sibling| : (curr_sibling = curr_sibling.?.next_sibling) {
+        try formatInner(sibling, writer, depth);
+    }
+}
+
 const Token = enum {
     brace_open,
     brace_close,
@@ -76,7 +101,7 @@ const ParentStack = struct {
 };
 
 fn parse(alloc: std.mem.Allocator, buff: []const u8) !Self {
-    var root: Self = .{ .is_root = true };
+    var root: Self = .{ .is_root = true, .label = "root" };
     var curr_parent: *Self = &root;
     var curr_child: ?*Self = null;
 
@@ -88,6 +113,7 @@ fn parse(alloc: std.mem.Allocator, buff: []const u8) !Self {
                 // TODO: When to switch curr_parent?
                 // Probably need a "stack" of parents.
                 const new_child: *Self = try alloc.create(Self);
+                new_child.* = .{};
                 if (curr_parent.first_child == null) {
                     curr_parent.first_child = new_child;
                     curr_child = new_child;
@@ -109,23 +135,24 @@ fn parse(alloc: std.mem.Allocator, buff: []const u8) !Self {
                 curr_child.?.label = label;
                 idx = next_idx;
             },
-            ':' => {
+            ':' => { // either literal or substructure
                 var next_idx: usize = idx + 1;
-                var found_comma: bool = false;
+                var found_literal: bool = false;
                 while(next_idx < buff.len) : (next_idx += 1) {
-                    if (buff[next_idx] == '[') {
+                    const next_char: u8 = buff[next_idx];
+                    if (next_char == '[' or next_char == '{') {
                         break;
-                    } else if (buff[next_idx] == ',') {
-                        found_comma = true;
+                    } else if (next_char == ',' or next_char == '\n') {
+                        found_literal = true;
                         break;
                     }
                 }
 
-                // TODO: We don't have , all the time (last element).
-                if(found_comma) {
+                if(found_literal) {
                     assert(curr_child != null);
                     // TODO: Remove whitespace from this?
                     curr_child.?.value = buff[(idx + 1)..next_idx];
+                    idx = next_idx;
                 }
             },
             '}', ']' => { // close current child => go back to parent?
