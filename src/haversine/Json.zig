@@ -3,10 +3,11 @@ const assert = std.debug.assert;
 
 const Self = @This();
 
-is_root: bool = false,
+// TODO: labels are currently slices into the parse buffer => Their lifetimes are linked.
 label: ?[]const u8 = null,
 value: ?[]const u8 = null,
 
+parent: ?*Self,
 first_child: ?*Self = null,
 next_sibling: ?*Self = null,
 
@@ -19,7 +20,7 @@ pub fn init(alloc: std.mem.Allocator, buff: []const u8) !Self {
 }
 
 pub fn deinit(self: *const Self, alloc: std.mem.Allocator) void {
-    assert(self.is_root); // Only allowed to deallocate the root json object.
+    assert(self.parent == null); // Only allowed to deallocate the root json object.
     deinitInner(self, alloc);
 } 
 fn deinitInner(self: *const Self, alloc: std.mem.Allocator) void {
@@ -76,11 +77,13 @@ fn formatInner(self: *const Self, writer: *std.io.Writer, depth: usize) std.io.W
 
     var curr_child: ?*Self = self.first_child;
     while(curr_child) |child_elem| : (curr_child = curr_child.?.next_sibling) {
+        try writer.print("child: {any}->{any}\n", .{ depth, depth + 1 });
         try formatInner(child_elem, writer, depth + 1);
     }
 
     var curr_sibling: ?*Self = self.next_sibling;
     while(curr_sibling) |sibling| : (curr_sibling = curr_sibling.?.next_sibling) {
+        try writer.print("sibling: {any}->{any}\n", .{ depth, depth });
         try formatInner(sibling, writer, depth);
     }
 }
@@ -95,32 +98,23 @@ const Token = enum {
     comma,
 };
 
-const ParentStack = struct {
-    curr: *Self,
-    prev: *Self,
-};
-
 fn parse(alloc: std.mem.Allocator, buff: []const u8) !Self {
-    var root: Self = .{ .is_root = true, .label = "root" };
-    var curr_parent: *Self = &root;
-    var curr_child: ?*Self = null;
+    var root: Self = .{ .parent = null, .label = "root" };
+    var curr_parent: ?*Self = null;
+    var curr_child: ?*Self = &root;
 
     var idx: usize = 0;
     while(idx < buff.len) {
         const char: u8 = buff[idx];
         switch(char) {
             '{', '[' => { // open a new child
-                // TODO: When to switch curr_parent?
-                // Probably need a "stack" of parents.
                 const new_child: *Self = try alloc.create(Self);
-                new_child.* = .{};
-                if (curr_parent.first_child == null) {
-                    curr_parent.first_child = new_child;
-                    curr_child = new_child;
-                } else {
-                    curr_child.?.next_sibling = new_child;
-                    curr_child = new_child;
-                }
+                new_child.* = .{ .parent = curr_child };
+
+                curr_parent = curr_child;
+                curr_parent.?.first_child = new_child;
+                curr_child = new_child;
+                std.debug.print("{f}\n", .{ root });
             },
             '"' => { // start label
                 assert(curr_child != null);
@@ -144,6 +138,7 @@ fn parse(alloc: std.mem.Allocator, buff: []const u8) !Self {
                         break;
                     } else if (next_char == ',' or next_char == '\n') {
                         found_literal = true;
+                        next_idx -= 1;
                         break;
                     }
                 }
@@ -153,12 +148,28 @@ fn parse(alloc: std.mem.Allocator, buff: []const u8) !Self {
                     // TODO: Remove whitespace from this?
                     curr_child.?.value = buff[(idx + 1)..next_idx];
                     idx = next_idx;
+                    std.debug.print("{f}\n", .{ root });
                 }
             },
-            '}', ']' => { // close current child => go back to parent?
+            ',' => { // create a new sibling
+                assert(curr_parent != null);
+                const new_sibling: *Self = try alloc.create(Self);
+                new_sibling.* = .{ .parent = curr_parent };
+                curr_child = new_sibling;
 
+                var last_child = curr_parent.?.first_child;
+                assert(last_child != null);
+                while(last_child != null and last_child.?.next_sibling != null) : (last_child = last_child.?.next_sibling) {}
+                last_child.?.next_sibling = new_sibling;
+                std.debug.print("{f}\n", .{ root });
             },
-            '\n', '\t', ' ', ',' => {},
+            '}', ']' => { // close current child
+                assert(curr_parent != null);
+                curr_child = curr_parent;
+                curr_parent = curr_parent.?.parent;
+                std.debug.print("{f}\n", .{ root });
+            },
+            '\n', '\t', ' ', => {},
             else => return Error.UnknownToken,
         }
 
