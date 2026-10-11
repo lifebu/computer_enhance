@@ -1,6 +1,9 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// JSON
+
 const Self = @This();
 
 label: ?[]const u8 = null,
@@ -9,6 +12,33 @@ first_child: ?*Self = null,
 next_sibling: ?*Self = null,
 
 const max_depth = 10;
+const max_width = 1_000;
+const JSONError = error {
+    // Parsing
+    TokenUnknown,
+    TokenUnexpected,
+    BufferExceeded,
+    OutOfMemory,
+    // Querry
+    ChildNotFound,
+    HasNoValue,
+};
+
+pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    try formatRecursive(self, writer, 0);
+}
+fn formatRecursive(self: *const Self, writer: *std.Io.Writer, depth: usize) std.Io.Writer.Error!void {
+    assert(depth < max_depth);
+
+    try writer.print("{*}", .{ self });
+    for(0..depth) |_| try writer.print("-", .{});
+    try writer.print("{s}: {s}\n", .{ self.label orelse "", self.value orelse "" });
+
+    var curr_child: ?*Self = self.first_child;
+    while(curr_child) |child_elem| : (curr_child = curr_child.?.next_sibling) {
+        try formatRecursive(child_elem, writer, depth + 1);
+    }
+}
 
 pub fn init(alloc: std.mem.Allocator, buff: []const u8) !*Self {
     var parser: Parser = .{ .buff = buff, .idx = 0 };
@@ -26,8 +56,9 @@ pub fn deinit(self: *const Self, alloc: std.mem.Allocator) void {
 fn deinitRecursive(self: ?*const Self, alloc: std.mem.Allocator, depth: usize) void {
     assert(depth < max_depth); // max recursion depth exceeded.
     var curr: ?*const Self = self;
-    while (curr) |curr_element| : (curr = curr_element.next_sibling) {
+    while (curr) |curr_element| {
         deinitRecursive(curr_element.first_child, alloc, depth + 1);
+        curr = curr_element.next_sibling;
         alloc.destroy(curr_element);
     }
 }
@@ -41,6 +72,7 @@ pub fn getChild(self: Self, name: []const u8) !*Self {
         }
     } else JSONError.ChildNotFound;
 }
+
 pub fn getElem(self: Self, name: []const u8, T: type) !T {
     assert(name.len != 0);
     const child: *Self = try self.getChild(name);
@@ -53,21 +85,6 @@ pub fn getElem(self: Self, name: []const u8, T: type) !T {
     }
 }
 
-pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    try formatInner(self, writer, 0);
-}
-fn formatInner(self: *const Self, writer: *std.Io.Writer, depth: usize) std.Io.Writer.Error!void {
-    assert(depth < max_depth);
-
-    for(0..depth) |_| try writer.print("-", .{});
-    try writer.print("{s}: {s}\n", .{ self.label orelse "", self.value orelse "" });
-
-    var curr_child: ?*Self = self.first_child;
-    while(curr_child) |child_elem| : (curr_child = curr_child.?.next_sibling) {
-        try formatInner(child_elem, writer, depth + 1);
-    }
-}
-
 pub fn printAllTokens(buff: []const u8) !void {
     var parser: Parser = .{ .buff = buff, .idx = 0 };
     while (parser.getNextToken()) |token| {
@@ -77,17 +94,9 @@ pub fn printAllTokens(buff: []const u8) !void {
     return .{};
 }
 
-const JSONError = error {
-    // Parsing
-    TokenUnknown,
-    TokenUnexpected,
-    BufferExceeded,
-    OutOfMemory,
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Parser
 
-    // Querry
-    ChildNotFound,
-    HasNoValue,
-};
 const TokenType = enum {
     brace_open,
     brace_close,
@@ -152,18 +161,14 @@ const Parser = struct {
                 self.idx = next_idx - 1; // Include the ',' for the next token
                 break: blk .{ .type = .number, .value = value };
             },
-            else => |val| {
-                std.log.err("Unknown Token: {c}", .{ val });
-                return JSONError.TokenUnknown;
-            }
+            else => |val| { std.log.err("Unknown Token: {c}", .{ val }); return JSONError.TokenUnknown; },
         };
 
         self.idx += 1;
         return result;
     }
 
-    pub fn parseList(parser: *Parser, alloc: std.mem.Allocator, start_token: Token, end_token_type: TokenType, has_labels: bool) JSONError!?*Self {
-        std.debug.print("parseList: start_token: {f}, end_token_type: {t}, has_labels: {}\n", .{ start_token, end_token_type, has_labels });
+    pub fn parseList(parser: *Parser, alloc: std.mem.Allocator, comptime end_token_type: TokenType, comptime has_labels: bool) JSONError!?*Self {
         var first: ?*Self = null;
         var last: ?*Self = null;
 
@@ -175,63 +180,41 @@ const Parser = struct {
                     .string => {
                         label = token.value;
                         token = try parser.getNextToken();
-                        assert(token.type == .colon);
+                        if (token.type != .colon) {
+                            std.log.err("Parse label failed with token: {t}", .{ token.type }); return JSONError.TokenUnexpected;
+                        }
                         token = try parser.getNextToken();
                     },
-                    else => |val| {
-                        if (val != end_token_type) {
-                            std.log.err("Failed to parse label. Got token: {t}", .{ val });
-                            return JSONError.TokenUnexpected;
-                        }
-                    },
+                    end_token_type => {},
+                    else => { std.log.err("Parse label failed with token: {t}", .{ token.type }); return JSONError.TokenUnexpected; },
                 }
             }
 
-            const child: ?*Self = try parser.parseElement(alloc, label, token);
-            if (child) |child_val| {
-                if (first == null) first = child_val;
-                if (last) |last_val| {
-                    last_val.next_sibling = child_val; 
-                }
-                last = child_val;
-            } else if (token.type == end_token_type) {
-                break;
-            } else {
-                std.log.err("Expected end token. Got token: {t}", .{ token.type });
-                return JSONError.TokenUnexpected;
-            }
+            const child: *Self = try parser.parseElement(alloc, label, token);
+            if (first == null) first = child;
+            if (last) |last_val| last_val.next_sibling = child;
+            last = child;
 
-            const end_token: Token = try parser.getNextToken();
-            if (end_token.type == end_token_type) {
-                break;
-            } else if (end_token.type != .comma) {
-                std.log.err("Expected end token. Got token: {t}", .{ end_token.type });
-                return JSONError.TokenUnexpected;
+            token = try parser.getNextToken();
+            switch (token.type) {
+                end_token_type => break,
+                .comma => {},
+                else => { std.log.err("Expected end token with token: {t}", .{ token.type }); return JSONError.TokenUnexpected; },
             }
         }
 
         return first;
     }
-    pub fn parseElement(parser: *Parser, alloc: std.mem.Allocator, label: ?[]const u8, token: Token) JSONError!?*Self {
-        std.debug.print("parseElement: label: {s}, token: {f}\n", .{ if(label) |label_val| label_val else "", token });
-        var child: ?*Self = null;
-        switch (token.type) {
-            .brace_open => {
-                child = try parser.parseList(alloc, token, .brace_close, true);
-            },
-            .bracket_open => {
-                child = try parser.parseList(alloc, token, .bracket_close, false);
-            },
-            .string, .number => {},
-            .finished => return null,
-            else => |val| {
-                std.log.err("Unexpected Token: {t}", .{ val });
-                return JSONError.TokenUnexpected;
-            }
-        }
-
+    pub fn parseElement(parser: *Parser, alloc: std.mem.Allocator, label: ?[]const u8, token: Token) JSONError!*Self {
         const result: *Self = try alloc.create(Self);
-        result.* = Self{ .label = label,  .value = token.value, .first_child = child, .next_sibling = null };
+        result.* = .{ .label = label, .value = token.value };
+
+        switch (token.type) {
+            .brace_open => result.first_child = try parser.parseList(alloc, .brace_close, true),
+            .bracket_open => result.first_child = try parser.parseList(alloc, .bracket_close, false),
+            .string, .number => {},
+            else => { std.log.err("Unexpected Token: {t}", .{ token.type }); return JSONError.TokenUnexpected; }
+        }
         return result;
     }
 };

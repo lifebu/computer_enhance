@@ -5,8 +5,6 @@ const def = @import("defines.zig");
 const Json = @import("Json.zig");
 const reference = @import("reference.zig");
 
-// TODO:
-// Write json parser for the input file and do the haversine calculation.
 pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []const u8, answer_file: []const u8) !void {
     std.log.info("json file: {s}", .{ json_file });
     const json_data = try std.Io.Dir.cwd().readFileAlloc(io, json_file, alloc, .limited(std.math.maxInt(u32)));
@@ -20,7 +18,6 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []con
 
     var parsed: *Json = try .init(alloc, json_data);
     defer parsed.deinit(alloc);
-    std.log.info("{f}", .{ parsed });
 
     const json_parent: *Json = try parsed.getChild("pairs");
     var pair_idx: usize = 0;
@@ -38,7 +35,6 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []con
         haversine_data.pairs[pair_idx] = .{
             .x0 = x0, .x1 = x1, .y0 = y0, .y1 = y1
         };
-        std.log.info("Parsed Haversine: ({}, {})->({}, {})", .{ x0, y0, x1, y1 });
     }
     const pair_count = pair_idx;
 
@@ -50,7 +46,6 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []con
         sum += distance * sum_coef;
     }
 
-    std.log.info("Json size: {}", .{ json_data.len });
     std.log.info("Pair count: {}", .{ pair_count });
     std.log.info("Haversine sum: {}", .{ sum });
 
@@ -70,7 +65,6 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []con
         }
 
         std.log.info("answer file: {s}", .{ answer_file });
-        std.log.info("Validation:", .{});
         std.log.info("Reference sum: {}", .{ reference_sum });
         std.log.info("Difference: {}", .{ sum - reference_sum });
     }
