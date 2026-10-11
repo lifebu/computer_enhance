@@ -7,9 +7,9 @@ const reference = @import("reference.zig");
 
 // TODO:
 // Write json parser for the input file and do the haversine calculation.
-pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answer_file: []const u8) !void {
+pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []const u8, answer_file: []const u8) !void {
     std.log.info("json file: {s}", .{ json_file });
-    const json_data = try std.fs.cwd().readFileAlloc(alloc, json_file, std.math.maxInt(u32));
+    const json_data = try std.Io.Dir.cwd().readFileAlloc(io, json_file, alloc, .limited(std.math.maxInt(u32)));
     defer alloc.free(json_data);
 
     const max_pairs = (json_data.len - 18) / 123; // lower limit found through testing.
@@ -18,8 +18,8 @@ pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answe
     };
     defer alloc.free(haversine_data.pairs);
 
-    const parsed: Json = try .init(alloc, json_data);
-    //defer parsed.deinit(alloc);
+    var parsed: *Json = try .init(alloc, json_data);
+    defer parsed.deinit(alloc);
     std.log.info("{f}", .{ parsed });
 
     const json_parent: ?*Json = parsed.getChild("pairs");
@@ -50,13 +50,13 @@ pub fn calculateHaversine(alloc: std.mem.Allocator, json_file: []const u8, answe
         sum += distance * sum_coef;
     }
 
-    std.log.info("Input size: {}", .{ json_data.len });
+    std.log.info("Json size: {}", .{ json_data.len });
     std.log.info("Pair count: {}", .{ pair_count });
     std.log.info("Haversine sum: {}", .{ sum });
 
     const has_answers: bool = answer_file.len != 0;
     if(has_answers) {
-        const answer_data = try std.fs.cwd().readFileAlloc(alloc, answer_file, std.math.maxInt(u32));
+        const answer_data = try std.Io.Dir.cwd().readFileAlloc(io, answer_file, alloc, .limited(std.math.maxInt(u32)));
         defer alloc.free(answer_data);
 
         var reference_sum: f64 = 0;

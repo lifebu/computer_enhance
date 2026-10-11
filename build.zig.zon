@@ -2,7 +2,7 @@
     .name = .computer_enhance,
     .version = "0.0.0",
     .fingerprint = 0xc318f2bfc4046ff, // Changing this has security and trust implications.
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         // See `zig fetch --save <url>` for a command-line interface for adding dependencies.
         //.example = .{

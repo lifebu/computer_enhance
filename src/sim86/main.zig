@@ -3,30 +3,26 @@ const builtin = @import("builtin");
 const Decoder = @import("Decoder.zig");
 const Instruction = @import("Instruction.zig");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const alloc = gpa.allocator();
-
+pub fn main(init: std.process.Init) !void {
     var buf: [1024]u8 = undefined;
-    var stdout = std.fs.File.stdout().writer(&buf);
+    var stdout = std.Io.File.stdout().writer(init.io, &buf);
     // TODO: Don't know why this breaks on windows!
     if(builtin.os.tag != .windows) {
-        defer stdout.file.unlock();
+        defer stdout.file.unlock(init.io);
     }
 
-    var args = try std.process.argsWithAllocator(alloc);
+    var args = init.minimal.args.iterate();
     defer args.deinit();
 
     _ = args.next(); // The file itself.
     if(args.next()) |path_relative| {
         try stdout.interface.print("; {s}:\n", .{ path_relative });
-        const contents = try std.fs.cwd().readFileAlloc(alloc, path_relative, 1024);
-        defer alloc.free(contents);
+        const contents = try std.Io.Dir.cwd().readFileAlloc(init.io, path_relative, init.gpa, .limited(1024));
+        defer init.gpa.free(contents);
 
         var decoder: Decoder = .{};
-        const result: []u8 = try decoder.disAsm(alloc, contents);
-        defer alloc.free(result);
+        const result: []u8 = try decoder.disAsm(init.gpa, contents);
+        defer init.gpa.free(result);
 
         try stdout.interface.print("{s}", .{ result });
         try stdout.interface.flush();

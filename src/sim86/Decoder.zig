@@ -52,13 +52,13 @@ fn parse(T: type, memory: []u8, mem_idx: *u8, exists: bool, is_wide: bool, sign_
 
     return if (exists) {
         if (is_wide) {
-            const word_type = @Type(std.builtin.Type{ .int = .{ .signedness = .unsigned, .bits = int_info.bits } });
+            const word_type = @Int(.unsigned, int_info.bits);
             const unsigend: word_type = memory[mem_idx.*] | (@as(u16, memory[mem_idx.* + 1]) << 8);
             const result: T = @bitCast(unsigend);
             mem_idx.* += 2;
             return result;
         } else {
-            const byte_type = @Type(std.builtin.Type{ .int = .{ .signedness = int_info.signedness, .bits = 8 } });
+            const byte_type = @Int(int_info.signedness, 8);
             const unsigned: u8 = memory[mem_idx.*];
             const result: byte_type = @bitCast(unsigned);
             mem_idx.* += 1;

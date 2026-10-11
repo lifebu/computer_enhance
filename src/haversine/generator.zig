@@ -4,7 +4,7 @@ const def = @import("defines.zig");
 const Random = @import("Random.zig");
 const reference = @import("reference.zig");
 
-pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64, num_coords: u64) !void {
+pub fn generateHaversine(io: std.Io, alloc: std.mem.Allocator, use_clusters: bool, seed: u64, num_coords: u64) !void {
     if(num_coords > def.max_haversine) {
         std.log.err("You can only generate files up to {}!", .{ def.max_haversine });
         return;
@@ -13,17 +13,17 @@ pub fn generateHaversine(alloc: std.mem.Allocator, use_clusters: bool, seed: u64
     const json_path = "results/haversine.json";
     const result_path = "results/haversine.f64";
 
-    const json_file = try std.fs.cwd().createFile(json_path, .{});
-    defer json_file.close();
+    const json_file = try std.Io.Dir.cwd().createFile(io, json_path, .{});
+    defer json_file.close(io);
 
     var json_buf: [1024]u8 = undefined;
-    var json_writer: std.fs.File.Writer = json_file.writer(&json_buf);
+    var json_writer: std.Io.File.Writer = json_file.writer(io, &json_buf);
 
-    const result_file = try std.fs.cwd().createFile(result_path, .{});
-    defer result_file.close();
+    const result_file = try std.Io.Dir.cwd().createFile(io, result_path, .{});
+    defer result_file.close(io);
 
     var result_buf: [1024]u8 = undefined;
-    var result_writer: std.fs.File.Writer = result_file.writer(&result_buf);
+    var result_writer: std.Io.File.Writer = result_file.writer(io, &result_buf);
 
     var rng: Random = .init(seed);
     var json_data: def.HaversineData = undefined;

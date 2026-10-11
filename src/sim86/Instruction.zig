@@ -31,7 +31,7 @@ pub const OperandRegister = struct {
     rfid: RegisterFileId,
     size: u2,
 
-    pub fn format(self: OperandRegister, writer: *std.io.Writer) std.io.Writer.Error!void {
+    pub fn format(self: OperandRegister, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         assert(self.size != 0 and self.size != 3);
         if(self.size == 1) {
             try writer.print("{s}", .{ @tagName(self.rfid) });
@@ -62,7 +62,7 @@ pub const MemoryMode = enum(u5) {
     bx_si, bx_di, bp_si, bp_di, 
     si, di, bp, bx,
 
-    pub fn format(self: MemoryMode, writer: *std.io.Writer) std.io.Writer.Error!void {
+    pub fn format(self: MemoryMode, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         try writer.print("{s}", .{ 
             switch (self) {
                 .direct => "",
@@ -93,7 +93,7 @@ pub const Flags = packed struct {
     wide: bool = false,
 };
 
-pub fn format(self: Self, writer: *std.io.Writer) std.io.Writer.Error!void {
+pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     if (self.operation == .segment or self.operation == .rep or self.operation == .lock) {
         return;
     }

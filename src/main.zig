@@ -10,11 +10,11 @@ const project_sim86 = "sim86";
 const project_haversine = "haversine";
 const project = project_haversine;
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     if (std.mem.eql(u8, project, project_sim86)) {
-        try sim86.main();
+        try sim86.main(init);
     } else if (std.mem.eql(u8, project, project_haversine)) {
-        try haversine.main();
+        try haversine.main(init);
     } else {
         std.debug.print("NO PROJECT LOADED???\n", .{});
     }

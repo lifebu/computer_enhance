@@ -5,14 +5,9 @@ const assert = std.debug.assert;
 const calculator = @import("calculator.zig");
 const generator = @import("generator.zig");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const alloc = gpa.allocator();
-
-    var args = try std.process.argsWithAllocator(alloc);
+pub fn main(init: std.process.Init) !void {
+    var args = init.minimal.args.iterate();
     defer args.deinit();
-
     _ = args.next(); // The file itself.
     if(args.next()) |command| {
         if(std.mem.eql(u8, command, "gen")) {
@@ -25,7 +20,7 @@ pub fn main() !void {
                 const seed: u64 = try std.fmt.parseInt(u64, args.next().?, 10);
                 const num_coords: u64 = try std.fmt.parseInt(u64, args.next().?, 10);
                 std.log.info("generate: use clusters: {}, seed: {}, num_coords: {}", .{ use_clusters, seed, num_coords });
-                try generator.generateHaversine(alloc, use_clusters, seed, num_coords);
+                try generator.generateHaversine(init.io, init.gpa, use_clusters, seed, num_coords);
             }
         } else if(std.mem.eql(u8, command, "calc")) {
             const json_file: ?[:0]const u8 = args.next();
@@ -34,7 +29,7 @@ pub fn main() !void {
                 std.log.info("[haversine_input.json] [answers.f64]", .{});
             } else {
                 const answer_file: []const u8 = args.next() orelse "";
-                try calculator.calculateHaversine(alloc, json_file.?, answer_file);
+                try calculator.calculateHaversine(init.io, init.gpa, json_file.?, answer_file);
             }
 
         } else {
