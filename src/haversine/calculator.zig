@@ -22,9 +22,9 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []con
     defer parsed.deinit(alloc);
     std.log.info("{f}", .{ parsed });
 
-    const json_parent: ?*Json = parsed.getChild("pairs");
+    const json_parent: *Json = try parsed.getChild("pairs");
     var pair_idx: usize = 0;
-    var json_pairs: ?*Json = if(json_parent != null) json_parent.?.first_child else null;
+    var json_pairs: ?*Json = json_parent.first_child;
     while(json_pairs) |json_elem| : ({ json_pairs = json_pairs.?.next_sibling; pair_idx += 1; }) {
         if(pair_idx > def.max_haversine) {
             break;

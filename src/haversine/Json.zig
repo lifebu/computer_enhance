@@ -5,51 +5,50 @@ const Self = @This();
 
 label: ?[]const u8 = null,
 value: ?[]const u8 = null,
-
 first_child: ?*Self = null,
 next_sibling: ?*Self = null,
 
+const max_depth = 10;
+
 pub fn init(alloc: std.mem.Allocator, buff: []const u8) !*Self {
-    const result: *Self = try parse(alloc, buff);
-    return result;
+    var parser: Parser = .{ .buff = buff, .idx = 0 };
+    const first_token: Token = try parser.getNextToken();
+    const root_opt: ?* Self = try parser.parseElement(alloc, "root", first_token);
+    const root: *Self = root_opt orelse @panic("JSON root could not be allocated");
+    return root;
 }
 
 pub fn deinit(self: *const Self, alloc: std.mem.Allocator) void {
-    assert(self.label != null); // Only allowed to deallocate the root json object.
+    assert(self.label != null); // Tried to free nothing?
     assert(std.mem.eql(u8, self.label.?, "root")); // Only allowed to deallocate the root json object.
-    deinitInner(self, alloc);
-    alloc.destroy(self);
+    deinitRecursive(self, alloc, 0);
 } 
-fn deinitInner(self: *const Self, alloc: std.mem.Allocator) void {
-    var curr_child: ?*Self = self.first_child;
-    while(curr_child) |child_elem| : (curr_child = curr_child.?.next_sibling) {
-        child_elem.deinitInner(alloc);
-        alloc.destroy(child_elem);
+fn deinitRecursive(self: ?*const Self, alloc: std.mem.Allocator, depth: usize) void {
+    assert(depth < max_depth); // max recursion depth exceeded.
+    var curr: ?*const Self = self;
+    while (curr) |curr_element| : (curr = curr_element.next_sibling) {
+        deinitRecursive(curr_element.first_child, alloc, depth + 1);
+        alloc.destroy(curr_element);
     }
 }
 
-pub fn getChild(self: Self, name: []const u8) ?*Self {
+pub fn getChild(self: Self, name: []const u8) !*Self {
+    assert(name.len != 0);
     var curr_child: ?*Self = self.first_child;
-    while(curr_child) |child_elem| : (curr_child = curr_child.?.next_sibling) {
+    return while(curr_child) |child_elem| : (curr_child = curr_child.?.next_sibling) {
         if(child_elem.label != null and std.mem.eql(u8, child_elem.label.?, name)) {
-            return curr_child;
+            return child_elem;
         }
-    }
-    return null;
+    } else JSONError.ChildNotFound;
 }
-
 pub fn getElem(self: Self, name: []const u8, T: type) !T {
-    const child: ?*Self = self.getChild(name);
-    assert(child != null); // Child not found.
-    assert(child.?.value != null); // Tried to access a json element that has no value.
-    if (child.?.value.?.len == 0) {
-        return 0;
-    }
+    assert(name.len != 0);
+    const child: *Self = try self.getChild(name);
+    const value: []const u8 = child.value orelse return JSONError.HasNoValue;
     
     const type_info: std.builtin.Type = @typeInfo(T);
     switch(type_info) {
-        // TODO: Should I write the float parse myself as well?
-        .float => return try std.fmt.parseFloat(T, child.?.value.?),
+        .float => return try std.fmt.parseFloat(T, value),
         else => return 0,
     }
 }
@@ -58,12 +57,9 @@ pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!voi
     try formatInner(self, writer, 0);
 }
 fn formatInner(self: *const Self, writer: *std.Io.Writer, depth: usize) std.Io.Writer.Error!void {
-    assert(depth < std.math.maxInt(u8)); // Deeper than 255 recursions?
+    assert(depth < max_depth);
 
-    try writer.print("{*}:", .{ self });
-    for(0..depth) |_| {
-        try writer.print("--", .{});
-    }
+    for(0..depth) |_| try writer.print("-", .{});
     try writer.print("{s}: {s}\n", .{ self.label orelse "", self.value orelse "" });
 
     var curr_child: ?*Self = self.first_child;
@@ -72,11 +68,25 @@ fn formatInner(self: *const Self, writer: *std.Io.Writer, depth: usize) std.Io.W
     }
 }
 
-pub const JSONError = error {
+pub fn printAllTokens(buff: []const u8) !void {
+    var parser: Parser = .{ .buff = buff, .idx = 0 };
+    while (parser.getNextToken()) |token| {
+        std.debug.print("Token: {f}\n", .{ token });
+        if (token.type == .finished) break;
+    } else |err| return err;
+    return .{};
+}
+
+const JSONError = error {
+    // Parsing
     TokenUnknown,
     TokenUnexpected,
     BufferExceeded,
     OutOfMemory,
+
+    // Querry
+    ChildNotFound,
+    HasNoValue,
 };
 const TokenType = enum {
     brace_open,
@@ -149,9 +159,9 @@ const Parser = struct {
         };
 
         self.idx += 1;
-        //std.debug.print("Token: {f}\n", .{ result });
         return result;
     }
+
     pub fn parseList(parser: *Parser, alloc: std.mem.Allocator, start_token: Token, end_token_type: TokenType, has_labels: bool) JSONError!?*Self {
         std.debug.print("parseList: start_token: {f}, end_token_type: {t}, has_labels: {}\n", .{ start_token, end_token_type, has_labels });
         var first: ?*Self = null;
@@ -202,7 +212,6 @@ const Parser = struct {
 
         return first;
     }
-
     pub fn parseElement(parser: *Parser, alloc: std.mem.Allocator, label: ?[]const u8, token: Token) JSONError!?*Self {
         std.debug.print("parseElement: label: {s}, token: {f}\n", .{ if(label) |label_val| label_val else "", token });
         var child: ?*Self = null;
@@ -226,24 +235,3 @@ const Parser = struct {
         return result;
     }
 };
-
-const print_tokens: bool = false;
-fn parse(alloc: std.mem.Allocator, buff: []const u8) !*Self {
-    if (print_tokens) {
-        var parser: Parser = .{ .buff = buff, .idx = 0 };
-
-        while (parser.getNextToken()) |token| {
-            if (token.type == .finished) {
-                break;
-            }
-        } else |err| return err;
-        return .{};
-    } else {
-        var parser: Parser = .{ .buff = buff, .idx = 0 };
-        const first_token: Token = try parser.getNextToken();
-        const root: ?* Self = try parser.parseElement(alloc, "root", first_token);
-        assert(root != null);
-        return root.?;
-    }
-
-}
