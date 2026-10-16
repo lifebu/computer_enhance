@@ -1,30 +1,56 @@
 # TODO
-## Decoder cleanup
-- Decoder.zig
-
-# Curr
+## Curr
+- Compress the introduction part.
 https://www.computerenhance.com/p/table-of-contents
-- Decoding Multiple INstructions and Suffixes
+- Introduction to RDTSC.
 
 # Introduction: Five Multipliers
-1st: Waste: CPU doing a lot more instructions that are not part of the core logic. Examples include cleanup code and interpreter overhead.
-2nd: IPC: 
+- Improve Performance: Reduce (A) number- and (B) speed of instructions.
+- Five multipliers: Total = Waste * IPC * SIMD * Caching * MT.
+## 1st: Waste: (A) 
+- Reduce waste: Do less work that is not part of the core logic (cleanup, interpretter overhead).
+## 2nd: IPC: "Instruction Parallelism" (B)
+- IPC = Instructions-Per-Clock, ILP = Instruction-Level-Parallelism.
+- ILP by parallelizing instructions that are not dependant on each other.
+- Avoid serial-dependenncy-chains, by using domain knowledge.
+## 3rd: SIMD: "Data Parallelism" (A)
+- Reduce instructions by working on multiple data at once. 
+- SIMD has bit width (e.g. 128bit) divided into lanes (e.g. 4 slots), which have a data size (e.g. 32-bit)
+    bit width = data size * lane count.
+    => Lower data size => more parallel lanes.
+- We specify the absence of a dependency-chain between the SIMD lanes.
+    - So the cpu does not need to deduce that.
+    - BUT: Requires absence of dependency (which operations might not have).
+## 4th: Caching: "Load Parallelism" (B)
+- Loads from memory happen in units of one cache line (64Bytes).
+- Cache hierarchy creates smaller, but faster memory on multiple levels.
+- E.g.: Register File -> L1 (32kB, 4cyc) -> L2 (512kB, 12cyc) -> L3 (16MB, 70cyc) -> Main Memory
+- Per core cache: L1, L2. Per cpu cache: L3. Fastest performance: all in L1 cache.
+## 5th: Multithreading: "Thread Parallelism" (B)
+- Multiple execution units (a core) with 2 hardware threads.
+- Starting/Synchronizing threads has a considerable overhead, which adds to the total cost.
+- Small work could be done on all threads instead of one thread + synchronize.
+- More cores => more L1 cache => work on more data inside of L1.
+- All-core loading might hid cpu-ram memory bandwidth limits => Limit to theoretical gain.
 
 # Part1: 8086 ASM
+## Curr
+- Decoding Multiple Instructions and Suffixes
+
 ## Code
 https://github.com/cmuratori/computer_enhance
 
-~/Software/zig/0.15.1/zig build run -- upstream/perfaware/part1/listing_0037_single_register_mov
-~/Software/zig/0.15.1/zig build test
+zig build run -- upstream/perfaware/part1/listing_0037_single_register_mov
+zig build test
 
-~/Software/zig/0.15.1/zig build run -- upstream/perfaware/part1/listing_0037_single_register_mov > result.asm
+zig build run -- upstream/perfaware/part1/listing_0037_single_register_mov > result.asm
 nasm result.asm
 diff upstream/perfaware/part1/listing_0037_single_register_mov result
 
 testing:
 zig build run -- upstream/perfaware/part1/listing_0039_more_movs > result.asm && nasm result.asm && diff result upstream/perfaware/part1/listing_0039_more_movs
 
-## Taks:
+## Tasks:
 (second is always the challenge version).
 0037-0038: mov
 0039-0040: mov variants.
@@ -71,7 +97,3 @@ https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 https://github.com/cmuratori/computer_enhance
 - listing 0065: haversine_formula
 
-### Writing a Simple Haversine Distance Processor.
-- Need to write a json parser for my input.
-- Two ways: Json as input => Generates the answer.
-    - Json and Answer as input => Generates the answer and validates:

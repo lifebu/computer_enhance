@@ -1,21 +1,12 @@
 const std = @import("std");
-const computer_enhance = @import("computer_enhance");
-const Decoder = @import("sim86/Decoder.zig");
-const Instruction = @import("sim86/Instruction.zig");
+const build = @import("build");
 
 const sim86 = @import("sim86/main.zig");
 const haversine = @import("haversine/main.zig");
 
-const project_sim86 = "sim86";
-const project_haversine = "haversine";
-const project = project_haversine;
-
 pub fn main(init: std.process.Init) !void {
-    if (std.mem.eql(u8, project, project_sim86)) {
-        try sim86.main(init);
-    } else if (std.mem.eql(u8, project, project_haversine)) {
-        try haversine.main(init);
-    } else {
-        std.debug.print("NO PROJECT LOADED???\n", .{});
+    switch (build.project) {
+        .haversine => try haversine.main(init),
+        .sim86 => try sim86.main(init),
     }
 }

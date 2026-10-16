@@ -1,12 +1,15 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const Project = enum { sim86, haversine };
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
     // llvm backend required for vscode debug symbols and performance is bad with self-hosted backend.
     const enable_llvm = b.option(bool, "enable_llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
+    const project = b.option(Project, "project", "Which project to build") orelse .haversine;
 
     // haversine
     const exe = b.addExecutable(.{
@@ -19,6 +22,10 @@ pub fn build(b: *std.Build) void {
         .use_llvm = enable_llvm,
     });
     b.installArtifact(exe);
+
+    const exe_options = b.addOptions();
+    exe_options.addOption(Project, "project", project);
+    exe.root_module.addOptions("build", exe_options);
 
     // run
     const run_step = b.step("run", "Run the app");
