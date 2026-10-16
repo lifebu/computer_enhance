@@ -1,8 +1,9 @@
 # TODO
 ## Curr
-- Compress the introduction part.
 https://www.computerenhance.com/p/table-of-contents
 - Introduction to RDTSC.
+    - compress the notes on rdtsc.
+    - Do the homework!
 
 # Introduction: Five Multipliers
 - Improve Performance: Reduce (A) number- and (B) speed of instructions.
@@ -93,7 +94,37 @@ https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
     - Second byte is 8-bit displacement.
 
 # Part2: Haversine
+## Next task:
+homework listing 75.
+- use the metrics library to:
+    - print cpu freq and total elapsed time.
+    - Then print the rdtsc values taken (amount + percent) for categories:
+        - Startup: Before reading file
+        - Read: Reading file
+        - MiscSetup: Setup (allocation, etc).
+        - Parse: Json parse.
+        - Sum: Calculating sum.
+        - MiscOutput: printing the results.
+
 ## Code
 https://github.com/cmuratori/computer_enhance
 - listing 0065: haversine_formula
 
+## RDTSC
+- Measuring the total time can be useful, but changes might lead to other knockdown effects that do not come directly from our changes. Need to benchmark on a granular level.
+- 8086: CPU did not keep the time itself, only external system.
+- RDTSC: Read Timestamp Counter Instruction. Writes into registers two halves of a 64-bit value.
+    - You can write to the value. Monotonically increasing overflowing counter.
+    - Value: "Time since processor started".
+    - Originally: Increment every cycle.
+    - Can take two measurements and get the delta. RDTSC itself might take time.
+    - Can do multiple iterations and divide by iteration count to reduce the effect of an error.
+- RDTSC But: 
+    - Multicore: Each core has a different frequency (manufacturing and frequency ranges, boost clocks).
+    => Switched to "Invariant TSC". At a speed something like "cycles", but a constant rate.
+    - Good for cross-core timing, basically an accurate wall-clock.
+    - RDPMC, RDPRU
+- Converting Timestamp Counter to time units.
+    - No easy way to get the frequency of the timer itself.
+    - Need to use other known os timers with known frequency to calculate the frequency.
+- listing 0070: functions to get timer metrics on differnt OS.

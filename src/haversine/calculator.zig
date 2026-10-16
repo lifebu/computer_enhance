@@ -9,6 +9,7 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []con
     std.log.info("json file: {s}", .{ json_file });
     const json_data = try std.Io.Dir.cwd().readFileAlloc(io, json_file, alloc, .limited(std.math.maxInt(u32)));
     defer alloc.free(json_data);
+    std.log.info("Input size: {}", .{ json_data.len });
 
     const max_pairs = (json_data.len - 18) / 123; // lower limit found through testing.
     var haversine_data: def.HaversineData = .{

@@ -4,8 +4,23 @@ const assert = std.debug.assert;
 
 const calculator = @import("calculator.zig");
 const generator = @import("generator.zig");
+const metrics = @import("metrics.zig");
 
 pub fn main(init: std.process.Init) !void {
+    const cpu_freq: u64 = metrics.approxCpuFreq(100);
+    const cpu_start: u64 = metrics.readCpuTimer();
+    const os_start: u64 = metrics.readOsTimer();
+    defer {
+        const os_end: u64 = metrics.readOsTimer();
+        const ms_total: f64 = metrics.getSeconds(os_start, os_end) * std.time.ms_per_s;
+        std.log.info("Total time: {:.4}ms (CPU freq: {})", .{ ms_total, cpu_freq });
+
+        const cpu_end: u64 = metrics.readCpuTimer();
+        const cpu_delta: u64 = cpu_end - cpu_start;
+        std.log.info("CPU Elapsed: {}", .{ cpu_delta });
+    }
+
+
     var args = init.minimal.args.iterate();
     defer args.deinit();
     _ = args.next(); // The file itself.
