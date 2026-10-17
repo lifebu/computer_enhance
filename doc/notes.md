@@ -1,7 +1,7 @@
 # TODO
 ## Curr
 https://www.computerenhance.com/p/table-of-contents
-- Introduction to RDTSC.
+- Profiling nested blocks:
 
 # Introduction: Five Multipliers
 - Improve Performance: Reduce (A) number- and (B) speed of instructions.
@@ -93,7 +93,7 @@ https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 
 # Part2: Haversine
 ## Next task:
-d_homework listing 75.
+- Profiling nested blocks:
 
 ## Code
 https://github.com/cmuratori/computer_enhance
@@ -106,5 +106,10 @@ https://github.com/cmuratori/computer_enhance
     - Monotonically increasing overflowing cycle counter starting with cpu. Can be written to.
     - Take two measurements for delta. Note: RDTSC itself takes time! Average measurements to reduce error.
 - CPU: Multicore with different frequencies (e.g. boost clocks).
-    => RDTSC is based on global constant frequency. Allows cross-core timing.
+    => RDTSC is based on global constant frequency (invariant TSC). Allows cross-core timing.
     - Cannot querry rdtsc frequency => Requires 2nd timer (e.g. OSTimer) to convert to real-time.
+- rdtscp: rdtsc + it puts the PID (Processor-Core-ID) of the core doing the rdtsc into a register.
+
+## Profiling Types
+- Instrumentation-based profiling: Adding code to the program to get metrics.
+- Sampling-based profiling: Does not change the original code.
