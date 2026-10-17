@@ -73,12 +73,17 @@ pub fn approxCpuFreq(ms_to_wait: u64) u64 {
     return cpu_freq;
 }
 
-pub fn getSeconds(os_start: u64, os_end: u64) f64 {
-    const os_freq: u64 = getOsTimerFreq();
+pub fn getSeconds(os_freq: u64, os_start: u64, os_end: u64) f64 {
     const os_freq_flt: f64 = @floatFromInt(os_freq);
 
     const os_delta: u64 = os_end - os_start;
     const os_delta_flt: f64 = @floatFromInt(os_delta);
     const s_total: f64 = (os_delta_flt / os_freq_flt);
     return s_total;
+}
+
+pub fn logDelta(name: []const u8, total_delta: u64, start: u64, end: u64) void {
+    const total_delta_flt: f64 = @floatFromInt(total_delta);
+    const delta: f64 = @floatFromInt(end - start);
+    std.log.info("{s}: {:.0} ({:.2}%)", .{ name, delta, delta / total_delta_flt * 100.0 });
 }

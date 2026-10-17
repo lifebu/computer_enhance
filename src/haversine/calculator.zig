@@ -4,19 +4,34 @@ const assert = std.debug.assert;
 const def = @import("defines.zig");
 const Json = @import("Json.zig");
 const reference = @import("reference.zig");
+const metrics = @import("metrics.zig");
 
-pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []const u8, answer_file: []const u8) !void {
+pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+    const total_os_start: u64 = metrics.readOsTimer();
+    const total_cpu_start: u64 = metrics.readCpuTimer();
+
+    const json_file: [:0]const u8 = args.next() orelse "";
+    const answer_file: []const u8 = args.next() orelse "";
+    if(json_file.len == 0) {
+        std.log.info("[haversine_input.json]", .{});
+        std.log.info("[haversine_input.json] [answers.f64]", .{});
+        return;
+    }
     std.log.info("json file: {s}", .{ json_file });
+
+    const read_file_cpu_start: u64 = metrics.readCpuTimer();
     const json_data = try std.Io.Dir.cwd().readFileAlloc(io, json_file, alloc, .limited(std.math.maxInt(u32)));
     defer alloc.free(json_data);
     std.log.info("Input size: {}", .{ json_data.len });
 
+    const setup_cpu_start: u64 = metrics.readCpuTimer();
     const max_pairs = (json_data.len - 18) / 123; // lower limit found through testing.
     var haversine_data: def.HaversineData = .{
         .pairs = try alloc.alloc(def.HaversinePairs, max_pairs),
     };
     defer alloc.free(haversine_data.pairs);
 
+    const json_cpu_start: u64 = metrics.readCpuTimer();
     var parsed: *Json = try .init(alloc, json_data);
     defer parsed.deinit(alloc);
 
@@ -39,6 +54,7 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []con
     }
     const pair_count = pair_idx;
 
+    const sum_cpu_start: u64 = metrics.readCpuTimer();
     var sum: f64 = 0.0;
     const sum_coef: f64 = 1.0 / @as(f64, @floatFromInt(pair_count));
     for(0..pair_count) |idx| {
@@ -47,6 +63,7 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []con
         sum += distance * sum_coef;
     }
 
+    const output_cpu_start: u64 = metrics.readCpuTimer();
     std.log.info("Pair count: {}", .{ pair_count });
     std.log.info("Haversine sum: {}", .{ sum });
 
@@ -69,4 +86,19 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: []con
         std.log.info("Reference sum: {}", .{ reference_sum });
         std.log.info("Difference: {}", .{ sum - reference_sum });
     }
+
+    const total_cpu_end: u64 = metrics.readCpuTimer();
+    const total_cpu_delta: u64 = total_cpu_end - total_cpu_start;
+    const total_os_end: u64 = metrics.readOsTimer();
+    const cpu_freq: u64 = metrics.approxCpuFreq(100);
+    const os_freq: u64 = metrics.getOsTimerFreq();
+    const total_ms: f64 = metrics.getSeconds(os_freq, total_os_start, total_os_end) * std.time.ms_per_s;
+    std.log.info("Total time: {:.4}ms (CPU freq: {})", .{ total_ms, cpu_freq });
+
+    metrics.logDelta("Startup", total_cpu_delta, total_cpu_start, read_file_cpu_start);
+    metrics.logDelta("Read", total_cpu_delta, read_file_cpu_start, setup_cpu_start);
+    metrics.logDelta("Setup", total_cpu_delta, setup_cpu_start, json_cpu_start);
+    metrics.logDelta("Json", total_cpu_delta, json_cpu_start, sum_cpu_start);
+    metrics.logDelta("Sum", total_cpu_delta, sum_cpu_start, output_cpu_start);
+    metrics.logDelta("Output", total_cpu_delta, sum_cpu_start, total_cpu_end);
 }
