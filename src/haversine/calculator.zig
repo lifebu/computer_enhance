@@ -8,6 +8,7 @@ const metrics = @import("metrics.zig");
 
 pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
     metrics.beginProfile(); 
+    defer metrics.endAndPrintProfile();
 
     const json_file: [:0]const u8 = args.next() orelse "";
     const answer_file: []const u8 = args.next() orelse "";
@@ -31,9 +32,12 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, args: *std.proce
     metrics.popScope();
 
     metrics.pushScope("Json");
+    metrics.pushScope("Json::Parse");
     var parsed: *Json = try .init(alloc, json_data);
     defer parsed.deinit(alloc);
+    metrics.popScope();
 
+    metrics.pushScope("Json::Lookup");
     const json_parent: *Json = try parsed.getChild("pairs");
     var pair_idx: usize = 0;
     var json_pairs: ?*Json = json_parent.first_child;
@@ -52,6 +56,7 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, args: *std.proce
         };
     }
     const pair_count = pair_idx;
+    metrics.popScope();
     metrics.popScope();
 
     metrics.pushScope("Sum");
@@ -86,6 +91,4 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, args: *std.proce
         std.log.info("Reference sum: {}", .{ reference_sum });
         std.log.info("Difference: {}", .{ sum - reference_sum });
     }
-
-    metrics.endAndPrintProfile();
 }

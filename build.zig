@@ -10,6 +10,7 @@ pub fn build(b: *std.Build) void {
     // llvm backend required for vscode debug symbols and performance is bad with self-hosted backend.
     const enable_llvm = b.option(bool, "enable_llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
     const project = b.option(Project, "project", "Which project to build") orelse .haversine;
+    const skip_metric_details = b.option(bool, "skip_metric_details", "Should metrics include details for each scope?") orelse false;
 
     // haversine
     const exe = b.addExecutable(.{
@@ -25,6 +26,7 @@ pub fn build(b: *std.Build) void {
 
     const exe_options = b.addOptions();
     exe_options.addOption(Project, "project", project);
+    exe_options.addOption(bool, "skip_metric_details", skip_metric_details);
     exe.root_module.addOptions("build", exe_options);
 
     // run

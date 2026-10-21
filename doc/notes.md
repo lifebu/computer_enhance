@@ -1,7 +1,7 @@
 # TODO
 ## Curr
 https://www.computerenhance.com/p/table-of-contents
-- Profiling nested blocks:
+- Section after profiler!
 
 # Introduction: Five Multipliers
 - Improve Performance: Reduce (A) number- and (B) speed of instructions.
@@ -93,7 +93,8 @@ https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 
 # Part2: Haversine
 ## Next task:
-- Profiling nested blocks:
+- Profiler: 
+    - compress notes.
 
 ## Code
 https://github.com/cmuratori/computer_enhance
@@ -110,6 +111,26 @@ https://github.com/cmuratori/computer_enhance
     - Cannot querry rdtsc frequency => Requires 2nd timer (e.g. OSTimer) to convert to real-time.
 - rdtscp: rdtsc + it puts the PID (Processor-Core-ID) of the core doing the rdtsc into a register.
 
-## Profiling Types
+## Profiling
 - Instrumentation-based profiling: Adding code to the program to get metrics.
 - Sampling-based profiling: Does not change the original code.
+- Profiling system goals: Easy to deploy, fairly accurate, low overhead. Extra: easy to interpret.
+
+## Profiling Solutions
+- gdmag: jonathan blows version: 
+https://github.com/dwilliamson/GDMagArchive/tree/master/feb03/blow/gdmag_profiling_2
+- casey: profile block retains starting time. elapsed time written back to anchor.
+- iprof: write start timer value to anchor.
+    - When block is opened it computes diff between parent start and now.
+    - Diff is added to parent's time.
+    - When the child block closes, it's parent's starting time is set to the current time.
+        => parent computes diff for inclusive time.
+        => computes differences value exclusive children.
+    - Total time (with children) uses a unique id generate from the current block callstack.
+    - It needs to add the values to the anchors only once when it walks those callstacks.
+    
+## Profiling overhead
+- Measure and know how you are changing the performance of the target. Very costly to add a lot of performance markups.
+- Total percentages will be skewed towards the most expensive markup.
+- It should be easy to remove the profiling sections for this reason.
+- Decide: What is most important to capture? Can we measure at a high enough level to not disrupt measurements?

@@ -1,6 +1,8 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
+const metrics = @import("metrics.zig");
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // JSON
 
@@ -49,6 +51,7 @@ pub fn init(alloc: std.mem.Allocator, buff: []const u8) !*Self {
 }
 
 pub fn deinit(self: *const Self, alloc: std.mem.Allocator) void {
+    metrics.pushScope("Json::Deinit"); defer metrics.popScope();
     assert(self.label != null); // Tried to free nothing?
     assert(std.mem.eql(u8, self.label.?, "root")); // Only allowed to deallocate the root json object.
     deinitRecursive(self, alloc, 0);
@@ -206,6 +209,8 @@ const Parser = struct {
         return first;
     }
     pub fn parseElement(parser: *Parser, alloc: std.mem.Allocator, label: ?[]const u8, token: Token) JSONError!*Self {
+        metrics.pushScope("Json::ParseElement"); defer metrics.popScope();
+
         const result: *Self = try alloc.create(Self);
         result.* = .{ .label = label, .value = token.value };
 
