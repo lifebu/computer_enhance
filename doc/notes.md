@@ -1,7 +1,7 @@
 # TODO
 ## Curr
 https://www.computerenhance.com/p/table-of-contents
-- Section after profiler!
+- Moving Data: Repetition Testing
 
 # Introduction: Five Multipliers
 - Improve Performance: Reduce (A) number- and (B) speed of instructions.
@@ -92,10 +92,6 @@ https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
     - Second byte is 8-bit displacement.
 
 # Part2: Haversine
-## Next task:
-- Profiler: 
-    - compress notes.
-
 ## Code
 https://github.com/cmuratori/computer_enhance
 - listing 0065: haversine_formula
@@ -134,3 +130,16 @@ https://github.com/dwilliamson/GDMagArchive/tree/master/feb03/blow/gdmag_profili
 - Total percentages will be skewed towards the most expensive markup.
 - It should be easy to remove the profiling sections for this reason.
 - Decide: What is most important to capture? Can we measure at a high enough level to not disrupt measurements?
+
+# Part 3: Moving Data
+## Next task:
+- Repetition Testing
+
+## Measuring Data Throughput
+- Speed upper bound: Data amount + Data speed.
+- Diagram of functions (blocks) connecting with their supplied data (arrow).
+    - How big are parts of the data? How expensive to read/write from/back system?
+    - Compared to measured storage medium speeds.
+- Add data amount to profiler block to measure throughput.
+
+## Repetition Testing

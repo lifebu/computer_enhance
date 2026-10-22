@@ -20,7 +20,12 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, args: *std.proce
     std.log.info("json file: {s}", .{ json_file });
 
     metrics.pushScope("ReadEntireFile");
+    const file: std.Io.File = try std.Io.Dir.cwd().openFile(io, json_file, .{});
+    const file_stat: std.Io.File.Stat = try file.stat(io);
+
+    metrics.pushScopeData("readFileAlloc", file_stat.size);
     const json_data = try std.Io.Dir.cwd().readFileAlloc(io, json_file, alloc, .limited(std.math.maxInt(u32)));
+    metrics.popScopeData();
     defer alloc.free(json_data);
     std.log.info("Input size: {}", .{ json_data.len });
 
@@ -59,7 +64,8 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, args: *std.proce
     metrics.popScope();
     metrics.popScope();
 
-    metrics.pushScope("Sum");
+
+    metrics.pushScopeData("Sum", pair_count * @sizeOf(def.HaversinePairs));
     var sum: f64 = 0.0;
     const sum_coef: f64 = 1.0 / @as(f64, @floatFromInt(pair_count));
     for(0..pair_count) |idx| {
@@ -67,7 +73,7 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, args: *std.proce
         const distance: f64 = reference.referenceHaversine(pair.x0, pair.y0, pair.x1, pair.y1, def.earth_radius);
         sum += distance * sum_coef;
     }
-    metrics.popScope();
+    metrics.popScopeData();
 
     std.log.info("Pair count: {}", .{ pair_count });
     std.log.info("Haversine sum: {}", .{ sum });

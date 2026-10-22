@@ -15,6 +15,7 @@ const Section = struct {
     hit_count: u64 = 0,
     delta_exclusive: u64 = 0, // No children
     delta_inclusive: u64 = 0, // Includes children
+    processed_bytes: u64 = 0,
 };
 
 const max_stack = 10;
@@ -47,29 +48,41 @@ pub fn beginProfile() void {
 pub fn endAndPrintProfile() void {
     const total_cpu_end: u64 = readCpuTimer();
     const total_cpu_delta: f64 = @floatFromInt(total_cpu_end - total_cpu_start);
-    const cpu_freq: f64 = @floatFromInt(approxCpuFreq(100));
+    const cpu_freq: f64 = @floatFromInt(approxCpuFreq());
     const total_ms: f64 = (total_cpu_delta / cpu_freq) * std.time.ms_per_s;
     std.log.info("__METRICS__", .{});
     std.log.info("Total time: {:.4}ms (CPU freq: {})", .{ total_ms, cpu_freq });
 
-    for (sections[(invalid_idx + 1)..next_section]) |section| {
+    var print_buff: [256]u8 = undefined;
+
+    for (sections[(invalid_idx + 1)..next_section]) |*section| {
         const exclusive_flt: f64 = @floatFromInt(section.delta_exclusive);
         const inclusive_flt: f64 = @floatFromInt(section.delta_inclusive);
+        const bytes_flt: f64 = @floatFromInt(section.processed_bytes);
         const exclusive: f64 =  (exclusive_flt / total_cpu_delta) * 100.0;
         const inclusive: f64 = (inclusive_flt / total_cpu_delta) * 100.0;
-        if (inclusive == exclusive) {
-            std.log.info("{s}[{}]: exclusive: {:.0} ({:.2}%)", .{ 
-                section.name, section.hit_count, section.delta_exclusive, exclusive
-            });
-        } else {
-            std.log.info("{s}[{}]: exclusive: {:.0} ({:.2}%), inclusive: ({:.2}%)", .{ 
-                section.name, section.hit_count, section.delta_exclusive, exclusive, inclusive
-            });
+        const delta_seconds: f64 = exclusive_flt / cpu_freq;
+        const mbytes: f64 = bytes_flt / (1024.0 * 1024.0);
+        const bytes_per_second: f64 = bytes_flt / delta_seconds;
+        const gbytes_per_second: f64 = bytes_per_second / (1024 * 1024 * 1024);
+
+        var writer: std.Io.Writer = .fixed(&print_buff);
+        writer.print("\t{s}[{}]: exclusive: {:.0} ({:.2}%)", .{
+            section.name, section.hit_count, section.delta_exclusive, exclusive
+        }) catch unreachable;
+        if (inclusive != exclusive) {
+            writer.print(", inclusive: ({:.2}%)", .{ inclusive }) catch unreachable;
         }
+        if (bytes_flt != 0.0) {
+            writer.print(", {:.3}mb at {:.2}gb/s", .{ mbytes, gbytes_per_second }) catch unreachable;
+        }
+        std.log.info("{s}", .{ writer.buffered() });
+
+        section.* = .{}; // Reset for next run.
     }
 }
 
-pub fn pushScope(comptime name: []const u8) void {
+pub fn pushScopeData(comptime name: []const u8, byte_count: u64) void {
     if (build.skip_metric_details) return;
     if (name.len == 0) @panic("Empty name for a scope used");
     if (next_stack >= (stack.len - 1)) @panic("Profiling section stack: OOM");
@@ -88,6 +101,7 @@ pub fn pushScope(comptime name: []const u8) void {
     const section: *Section = &sections[section_idx];
     section.name_crc = name_crc;
     section.name = name;
+    section.processed_bytes += byte_count;
 
     const new_stack: *Stack = &stack[next_stack];
     new_stack.* = .{ 
@@ -98,8 +112,7 @@ pub fn pushScope(comptime name: []const u8) void {
     next_stack += 1;
     new_stack.begin = readCpuTimer();
 }
-
-pub fn popScope() void {
+pub fn popScopeData() void {
     if (build.skip_metric_details) return;
     const end: u64 = readCpuTimer();
     if (next_stack <= 0) @panic("No scope was created");
@@ -117,10 +130,16 @@ pub fn popScope() void {
     current_parent = curr_stack.parent_idx;
 }
 
+pub fn pushScope(comptime name: []const u8) void {
+    pushScopeData(name, 0);
+}
+pub fn popScope() void {
+    popScopeData();
+}
+
 pub fn pushFunc(comptime src: std.builtin.SourceLocation) void {
     pushScope(src.file ++ "." ++ src.fn_name);
 }
-
 pub fn popFunc() void {
     popScope();
 }
@@ -176,7 +195,8 @@ inline fn readCpuTimer() u64 {
     return (@as(u64, hi) << 32) | @as(u64, low);
 }
 
-inline fn approxCpuFreq(ms_to_wait: u64) u64 {
+inline fn approxCpuFreq() u64 {
+    const ms_to_wait: u64 = 100;
     const os_freq: u64 = getOsTimerFreq();
     const wait_time: u64 = (os_freq * ms_to_wait) / 1_000;
 

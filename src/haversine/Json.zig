@@ -209,8 +209,6 @@ const Parser = struct {
         return first;
     }
     pub fn parseElement(parser: *Parser, alloc: std.mem.Allocator, label: ?[]const u8, token: Token) JSONError!*Self {
-        metrics.pushScope("Json::ParseElement"); defer metrics.popScope();
-
         const result: *Self = try alloc.create(Self);
         result.* = .{ .label = label, .value = token.value };
 
