@@ -144,6 +144,13 @@ pub fn popFunc() void {
     popScope();
 }
 
+pub fn enterToContinue(io: std.Io, comptime message: []const u8) void {
+    std.log.info("{s}: Press enter to continue", .{ message });
+    var buff: [64]u8 = undefined;
+    // No error handling as we don't care in a test / debug function.
+    _ = std.Io.File.stdin().readStreaming(io, &.{ &buff }) catch {};
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Internals
 

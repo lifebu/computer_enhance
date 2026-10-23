@@ -6,17 +6,10 @@ const Json = @import("Json.zig");
 const reference = @import("reference.zig");
 const metrics = @import("metrics.zig");
 
-pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, args: *std.process.Args.Iterator) !void {
+pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, json_file: [:0]const u8, answer_file: []const u8) !void {
     metrics.beginProfile(); 
     defer metrics.endAndPrintProfile();
 
-    const json_file: [:0]const u8 = args.next() orelse "";
-    const answer_file: []const u8 = args.next() orelse "";
-    if(json_file.len == 0) {
-        std.log.info("[haversine_input.json]", .{});
-        std.log.info("[haversine_input.json] [answers.f64]", .{});
-        return;
-    }
     std.log.info("json file: {s}", .{ json_file });
 
     metrics.pushScope("ReadEntireFile");
@@ -63,7 +56,6 @@ pub fn calculateHaversine(io: std.Io, alloc: std.mem.Allocator, args: *std.proce
     const pair_count = pair_idx;
     metrics.popScope();
     metrics.popScope();
-
 
     metrics.pushScopeData("Sum", pair_count * @sizeOf(def.HaversinePairs));
     var sum: f64 = 0.0;

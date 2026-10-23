@@ -23,7 +23,14 @@ pub fn main(init: std.process.Init) !void {
                 try generator.generateHaversine(init.io, init.gpa, use_clusters, seed, num_coords);
             }
         } else if(std.mem.eql(u8, command, "calc")) {
-            try calculator.calculateHaversine(init.io, init.gpa, &args);
+            const json_file: [:0]const u8 = args.next() orelse "";
+            const answer_file: []const u8 = args.next() orelse "";
+            if(json_file.len == 0) {
+                std.log.info("[haversine_input.json]", .{});
+                std.log.info("[haversine_input.json] [answers.f64]", .{});
+                return;
+            }
+            try calculator.calculateHaversine(init.io, init.gpa, json_file, answer_file);
         } else {
             std.log.err("Unknown command: {s}", .{ command });
         }
